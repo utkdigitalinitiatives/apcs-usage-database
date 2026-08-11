@@ -1,0 +1,300 @@
+---
+title: "Usage Gaps by Vendor Tracker"
+author: "Alexander Harriman"
+date: "2025-11-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+This code takes the Usage File Tracker Reports created by the "Updating COUNTER Data to SQLite3" Python code and cleans them up to see what sources may be missing usage information.
+
+Each file follows the same format: grouped by vendor, it checks how many rows of usage exist for each six-month period. If there are no usage rows for a six-month period, then that means either the usage is missing or that it was unavailable. Usage that is more than 3 years old is less likely to be stored by most of our vendors, but newer 0 values in these reports may mean there was truly no usage or that it is a hole in our usage stats.
+
+Each six-month period will need to be added to these functions as they appear. Each row within the "summarise" functions below works the same, so you can copy one row and edit the months to fit the new six-month period.
+
+The Usage File Tracker Reports for COUNTER Master Reports (PR, DR, TR) only contain the last three years' worth of information, so older columns will need to be deleted or commented out as new six-month blocks are added in.
+
+Usage was last checked for gaps in July 2026.
+
+
+```{r}
+library(dplyr)
+library(readxl)
+library(writexl)
+```
+
+
+# PR
+
+
+```{r}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Usage Database Update\\Usage File Tracker Reports')
+
+prFile <- read_excel('PR Usage File Tracker Report.xlsx')
+
+prGaps <- prFile |>
+  group_by(Vendor) |>
+  summarise(#Jan_Jun_2021 = sum(Jan_Jun_2021),
+            #Jul_Dec_2021 = sum(Jul_Dec_2021),
+            #Jan_Jun_2022 = sum(Jan_Jun_2022),
+            #Jul_Dec_2022 = sum(Jul_Dec_2022),
+            #Jan_Jun_2023 = sum(Jan_Jun_2023),
+            Jul_Dec_2023 = sum(Jul_Dec_2023),
+            Jan_Jun_2024 = sum(Jan_Jun_2024),
+            Jul_Dec_2024 = sum(Jul_Dec_2024),
+            Jan_Jun_2025 = sum(Jan_Jun_2025),
+            Jul_Dec_2025 = sum(Jul_Dec_2025),
+            Jan_Jun_2026 = sum(Jan_Jun_2026)) |>
+  arrange(Vendor)
+
+prGaps
+```
+
+
+
+```{r}
+write_xlsx(prGaps, 'PR Gap Checker.xlsx')
+```
+
+
+
+# DR
+
+
+```{r}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Usage Database Update\\Usage File Tracker Reports')
+
+drFile <- read_excel('DR Usage File Tracker Report.xlsx')
+
+drGaps <- drFile |>
+  group_by(Vendor) |>
+  summarise(#Jan_Jun_2021 = sum(Jan_Jun_2021),
+            #Jul_Dec_2021 = sum(Jul_Dec_2021),
+            #Jan_Jun_2022 = sum(Jan_Jun_2022),
+            #Jul_Dec_2022 = sum(Jul_Dec_2022),
+            #Jan_Jun_2023 = sum(Jan_Jun_2023),
+            Jul_Dec_2023 = sum(Jul_Dec_2023),
+            Jan_Jun_2024 = sum(Jan_Jun_2024),
+            Jul_Dec_2024 = sum(Jul_Dec_2024),
+            Jan_Jun_2025 = sum(Jan_Jun_2025),
+            Jul_Dec_2025 = sum(Jul_Dec_2025),
+            Jan_Jun_2026 = sum(Jan_Jun_2026)) |>
+  arrange(Vendor)
+
+drGaps
+```
+
+
+```{r}
+write_xlsx(drGaps, 'DR Gap Checker.xlsx')
+```
+
+
+
+# TR
+
+
+```{r}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Usage Database Update\\Usage File Tracker Reports')
+
+trFile <- read_excel('TR Usage File Tracker Report.xlsx')
+
+trGaps <- trFile |>
+  group_by(Vendor) |>
+  summarise(#Jan_Jun_2021 = sum(Jan_Jun_2021),
+            #Jul_Dec_2021 = sum(Jul_Dec_2021),
+            #Jan_Jun_2022 = sum(Jan_Jun_2022),
+            #Jul_Dec_2022 = sum(Jul_Dec_2022),
+            #Jan_Jun_2023 = sum(Jan_Jun_2023),
+            Jul_Dec_2023 = sum(Jul_Dec_2023),
+            Jan_Jun_2024 = sum(Jan_Jun_2024),
+            Jul_Dec_2024 = sum(Jul_Dec_2024),
+            Jan_Jun_2025 = sum(Jan_Jun_2025),
+            Jul_Dec_2025 = sum(Jul_Dec_2025),
+            Jan_Jun_2026 = sum(Jan_Jun_2026)) |>
+  arrange(Vendor)
+
+trGaps
+```
+
+
+
+```{r}
+write_xlsx(trGaps, 'TR Gap Checker.xlsx')
+
+rm(trFile)
+```
+
+
+# TR_B3
+
+
+```{r}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Usage Database Update\\Usage File Tracker Reports')
+
+trb3File <- read_excel('TR_B3 Usage File Tracker Report.xlsx')
+
+trb3Gaps <- trb3File |>
+  group_by(Vendor) |>
+  summarise(#Jul_Dec_2021 = sum(Jul_Dec_2021),
+            Jan_Jun_2022 = sum(Jan_Jun_2022),
+            Jul_Dec_2022 = sum(Jul_Dec_2022),
+            Jan_Jun_2023 = sum(Jan_Jun_2023),
+            Jul_Dec_2023 = sum(Jul_Dec_2023),
+            Jan_Jun_2024 = sum(Jan_Jun_2024),
+            Jul_Dec_2024 = sum(Jul_Dec_2024),
+            Jan_Jun_2025 = sum(Jan_Jun_2025),
+            Jul_Dec_2025 = sum(Jul_Dec_2025),
+            Jan_Jun_2026 = sum(Jan_Jun_2026)) |>
+  arrange(Vendor)
+
+trb3Gaps
+```
+
+
+
+
+```{r}
+write_xlsx(trb3Gaps, 'TR_B3 Gap Checker.xlsx')
+```
+
+
+
+# IR_M1
+
+
+```{r, warning = FALSE}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Usage Database Update\\Usage File Tracker Reports')
+
+irm1File <- read_excel('IR_M1 Usage File Tracker Report.xlsx')
+
+irm1Gaps <- irm1File |>
+  group_by(Vendor) |>
+  summarise(#Jul_Dec_2021 = sum(Jul_Dec_2021),
+            Jan_Jun_2022 = sum(Jan_Jun_2022),
+            Jul_Dec_2022 = sum(Jul_Dec_2022),
+            Jan_Jun_2023 = sum(Jan_Jun_2023),
+            Jul_Dec_2023 = sum(Jul_Dec_2023),
+            Jan_Jun_2024 = sum(Jan_Jun_2024),
+            Jul_Dec_2024 = sum(Jul_Dec_2024),
+            Jan_Jun_2025 = sum(Jan_Jun_2025),
+            Jul_Dec_2025 = sum(Jul_Dec_2025),
+            Jan_Jun_2026 = sum(Jan_Jun_2026)) |>
+  arrange(Vendor)
+
+irm1Gaps
+```
+
+
+
+
+
+```{r}
+write_xlsx(irm1Gaps, 'IR_M1 Gap Checker.xlsx')
+```
+
+
+# TR_J3
+
+
+```{r}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Usage Database Update\\Usage File Tracker Reports')
+
+trj3File <- read_excel('TR_J3 Usage File Tracker Report.xlsx')
+
+trj3Gaps <- trj3File |>
+  group_by(Vendor) |>
+  summarise(#Jul_Dec_2021 = sum(Jul_Dec_2021),
+            Jan_Jun_2022 = sum(Jan_Jun_2022),
+            Jul_Dec_2022 = sum(Jul_Dec_2022),
+            Jan_Jun_2023 = sum(Jan_Jun_2023),
+            Jul_Dec_2023 = sum(Jul_Dec_2023),
+            Jan_Jun_2024 = sum(Jan_Jun_2024),
+            Jul_Dec_2024 = sum(Jul_Dec_2024),
+            Jan_Jun_2025 = sum(Jan_Jun_2025),
+            Jul_Dec_2025 = sum(Jul_Dec_2025),
+            Jan_Jun_2026 = sum(Jan_Jun_2026)) |>
+  arrange(Vendor)
+
+trj3Gaps
+```
+
+
+
+
+```{r}
+write_xlsx(trj3Gaps, 'TR_J3 Gap Checker.xlsx')
+```
+
+
+
+# DR_D1
+
+
+```{r, warning = FALSE}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Usage Database Update\\Usage File Tracker Reports')
+
+
+drd1File <- read_excel('DR_D1 Usage File Tracker Report.xlsx')
+
+drd1Gaps <- drd1File |>
+  group_by(Vendor) |>
+  summarise(#Jul_Dec_2021 = sum(Jul_Dec_2021),
+            Jan_Jun_2022 = sum(Jan_Jun_2022),
+            Jul_Dec_2022 = sum(Jul_Dec_2022),
+            Jan_Jun_2023 = sum(Jan_Jun_2023),
+            Jul_Dec_2023 = sum(Jul_Dec_2023),
+            Jan_Jun_2024 = sum(Jan_Jun_2024),
+            Jul_Dec_2024 = sum(Jul_Dec_2024),
+            Jan_Jun_2025 = sum(Jan_Jun_2025),
+            Jul_Dec_2025 = sum(Jul_Dec_2025),
+            Jan_Jun_2026 = sum(Jan_Jun_2026)) |>
+  arrange(Vendor)
+
+drd1Gaps
+```
+
+
+
+
+```{r}
+write_xlsx(drd1Gaps, 'DR_D1 Gap Checker.xlsx')
+```
+
+
+
+# PR_P1
+
+
+```{r, warning = FALSE}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Usage Database Update\\Usage File Tracker Reports')
+
+prp1File <- read_excel('PR_P1 Usage File Tracker Report.xlsx')
+
+prp1Gaps <- prp1File |>
+  group_by(Vendor) |>
+  summarise(#Jul_Dec_2021 = sum(Jul_Dec_2021),
+            Jan_Jun_2022 = sum(Jan_Jun_2022),
+            Jul_Dec_2022 = sum(Jul_Dec_2022),
+            Jan_Jun_2023 = sum(Jan_Jun_2023),
+            Jul_Dec_2023 = sum(Jul_Dec_2023),
+            Jan_Jun_2024 = sum(Jan_Jun_2024),
+            Jul_Dec_2024 = sum(Jul_Dec_2024),
+            Jan_Jun_2025 = sum(Jan_Jun_2025),
+            Jul_Dec_2025 = sum(Jul_Dec_2025),
+            Jan_Jun_2026 = sum(Jan_Jun_2026)) |>
+  arrange(Vendor)
+
+prp1Gaps
+```
+
+
+
+```{r}
+write_xlsx(prp1Gaps, 'PR_P1 Gap Checker.xlsx')
+```

@@ -1,0 +1,839 @@
+---
+title: "Joining LC Codes to E-Usage"
+author: "Alexander Harriman"
+date: "2026-05-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r, warning = FALSE}
+reticulate::py_config()
+library(readxl)
+library(RSQLite)
+library(DBI)
+library(dplyr)
+library(tidyverse)
+library(stringr)
+library(writexl)
+library(fuzzywuzzyR)
+```
+
+
+
+# Load the Alma Data
+
+```{r}
+almaData1 <- read_excel('Alma Electronic Collection ISSNs and ISBNs for Usage Joining Part 1.xlsx') 
+
+almaData2 <- read_excel('Alma Electronic Collection ISSNs and ISBNs for Usage Joining Part 2.xlsx')
+
+almaData <- rbind(almaData1, almaData2)
+```
+
+
+
+
+# Use Subjects to Find LC for Unknown Items
+
+
+Alma's subject information on each item may be able to help us identify its LC code when the LC code is Unknown.
+
+
+## Get the Unknown Titles
+
+```{r}
+almaUnknown <- almaData |>
+  filter(`Classification Code` == 'Unknown')
+
+almaUnknown
+```
+
+
+## Assign LC Codes by Subject
+
+
+
+
+```{r}
+assignedLCUnknown <- almaUnknown |>
+  mutate(`Classification Code` = case_when(
+    # Clear Identifiers
+    grepl('Engineering', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Comput', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Information technology', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Three-dimensional imaging', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Math', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Algebra', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Circuits', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Economic', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Medic', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Endocrine', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Wireless', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Satellites', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Navy', Subjects, ignore.case = TRUE) == TRUE ~ 'V',
+    grepl('Air Force', Subjects, ignore.case = TRUE) == TRUE ~ 'U',
+    grepl('Army', Subjects, ignore.case = TRUE) == TRUE ~ 'U',
+    grepl('Internet', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Robot', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Artificial intelligence', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',  
+    grepl('Accounting', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Bank', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Social sciences', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Commerce', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Health', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Philosophy', Subjects, ignore.case = TRUE) == TRUE ~ 'B',
+    grepl('languages', Subjects, ignore.case = TRUE) == TRUE ~ 'P',
+    grepl('Surgery', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Agricultur', Subjects, ignore.case = TRUE) == TRUE ~ 'S',
+    grepl('Kidney', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Nurs', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Military', Subjects, ignore.case = TRUE) == TRUE ~ 'U',
+    grepl('Hedge fund', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('econòmique', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Ortho', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Business', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Treatment', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Homosexual', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Patient', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Fruit', Subjects, ignore.case = TRUE) == TRUE ~ 'S',
+    grepl('Automobile', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Baseball', Subjects, ignore.case = TRUE) == TRUE ~ 'G',
+    grepl('Wrestling', Subjects, ignore.case = TRUE) == TRUE ~ 'G',
+    grepl('Software', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Aeronautics', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Airplane', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Airport', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Chemistry', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Horticultur', Subjects, ignore.case = TRUE) == TRUE ~ 'S',
+    grepl('Advertis', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Anesthe', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Archbishop', Subjects, ignore.case = TRUE) == TRUE ~ 'B',
+    grepl('Linguistics', Subjects, ignore.case = TRUE) == TRUE ~ 'P',
+    grepl('Architect', Subjects, ignore.case = TRUE) == TRUE ~ 'N',
+    grepl('Education', Subjects, ignore.case = TRUE) == TRUE ~ 'L',
+    grepl('Tinnitus', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Cancer', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Astro', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Atom', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Automat', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Bible', Subjects, ignore.case = TRUE) == TRUE ~ 'B',
+    grepl('Bibliography', Subjects, ignore.case = TRUE) == TRUE ~ 'Z',
+    grepl('Almanac', Subjects, ignore.case = TRUE) == TRUE ~ 'A',
+    grepl('Botany', Subjects, ignore.case = TRUE) == TRUE ~ 'S',
+    grepl('Building', Subjects, ignore.case = TRUE) == TRUE ~ 'N',
+    grepl('Church', Subjects, ignore.case = TRUE) == TRUE ~ 'B',
+    grepl('Music', Subjects, ignore.case = TRUE) == TRUE ~ 'N',
+    grepl('Cloning', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Christian', Subjects, ignore.case = TRUE) == TRUE ~ 'B',
+    grepl('Buddhi', Subjects, ignore.case = TRUE) == TRUE ~ 'B',
+    grepl('Economy', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Finance', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Physics', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Court', Subjects, ignore.case = TRUE) == TRUE ~ 'K',
+    grepl('Criminal', Subjects, ignore.case = TRUE) == TRUE ~ 'K',
+    grepl('Data', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Dentist', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Equation', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Credit', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Econometrics', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Funds', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Electric', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Poetry', Subjects, ignore.case = TRUE) == TRUE ~ 'P',
+    grepl('Psych', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Religion', Subjects, ignore.case = TRUE) == TRUE ~ 'B',
+    grepl('Arachnida', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Archery', Subjects, ignore.case = TRUE) == TRUE ~ 'G',
+    grepl('Language', Subjects, ignore.case = TRUE) == TRUE ~ 'P',
+    grepl('Bacteri', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Variable', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Breeding', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Capitalism', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Climat', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Pollution', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Brain', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Bone', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Chiropractic', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Geometry', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Diabetes', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Libraries', Subjects, ignore.case = TRUE) == TRUE ~ 'Z',
+    grepl('Dynamics', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Migration', Subjects, ignore.case = TRUE) == TRUE ~ 'J',
+    grepl('Drama', Subjects, ignore.case = TRUE) == TRUE ~ 'N',
+    grepl('Justice', Subjects, ignore.case = TRUE) == TRUE ~ 'K',
+    grepl('Fluid', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Football', Subjects, ignore.case = TRUE) == TRUE ~ 'G',
+    grepl('Genom', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Geograph', Subjects, ignore.case = TRUE) == TRUE ~ 'G',
+    grepl('Britain', Subjects, ignore.case = TRUE) == TRUE ~ 'D',
+    grepl('Latin America', Subjects, ignore.case = TRUE) == TRUE ~ 'F',
+    grepl('Agronomy', Subjects, ignore.case = TRUE) == TRUE ~ 'S',
+    grepl('Craniofacial', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Dairy', Subjects, ignore.case = TRUE) == TRUE ~ 'S',
+    grepl('Detector', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Diagnostic imaging', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Marriage', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Drone', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Election', Subjects, ignore.case = TRUE) == TRUE ~ 'J',
+    grepl('Ethics', Subjects, ignore.case = TRUE) == TRUE ~ 'B',
+    grepl('Feeds', Subjects, ignore.case = TRUE) == TRUE ~ 'S',
+    grepl('Hunting', Subjects, ignore.case = TRUE) == TRUE ~ 'G',
+    grepl('Plant', Subjects, ignore.case = TRUE) == TRUE ~ 'S',
+    grepl('Freemason', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Gay', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Social & cultural', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Hospital', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Genetics', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Image processing', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('International relation', Subjects, ignore.case = TRUE) == TRUE ~ 'J',
+    grepl('Film', Subjects, ignore.case = TRUE) == TRUE ~ 'N',
+    grepl('Judaism', Subjects, ignore.case = TRUE) == TRUE ~ 'B',
+    grepl('Jesus', Subjects, ignore.case = TRUE) == TRUE ~ 'B',
+    grepl('Lasers', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Machine learning', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Manufactur', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Mechanics', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Motor', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Multibody', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Naturopathy', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Optometry', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Paint', Subjects, ignore.case = TRUE) == TRUE ~ 'N',
+    grepl('Pediatric', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Phenotype', Subjects, ignore.case = TRUE) == TRUE ~ 'S',
+    grepl('Physical therapy', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Probabilit', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Quantum', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Camping', Subjects, ignore.case = TRUE) == TRUE ~ 'G',
+    grepl('Sex', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Sound', Subjects, ignore.case = TRUE) == TRUE ~ 'M',
+    grepl('Statistic', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Teach', Subjects, ignore.case = TRUE) == TRUE ~ 'L',
+    grepl('Tech', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    
+
+    
+
+
+    
+    # Generalities
+    grepl('Newspaper', Subjects, ignore.case = TRUE) == TRUE ~ 'P',
+    grepl('Literature', Subjects, ignore.case = TRUE) == TRUE ~ 'P',
+    grepl('Electronic', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Energy', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('IEEE', Title, ignore.case = FALSE) == TRUE ~ 'T',
+    grepl('Art', Subjects, ignore.case = TRUE) == TRUE ~ 'N',
+    grepl('Signal', Subjects, ignore.case = TRUE) == TRUE ~ 'T', 
+    grepl('ology', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Electro', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Transportation', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Care', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Sport', Subjects, ignore.case = TRUE) == TRUE ~ 'G',   
+    grepl('trade', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Bio', Subjects, ignore.case = TRUE) == TRUE ~ 'R',   
+    grepl('Pharma', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('fitness', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Tele', Subjects, ignore.case = TRUE) == TRUE ~ 'T',
+    grepl('Big data', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Canad', Subjects, ignore.case = TRUE) == TRUE ~ 'F',
+    grepl('Australia', Subjects, ignore.case = TRUE) == TRUE ~ 'D',
+    grepl('Africa', Subjects, ignore.case = TRUE) == TRUE ~ 'D',
+    grepl('Alberta', Subjects, ignore.case = TRUE) == TRUE ~ 'F',
+    grepl('Disease', Subjects, ignore.case = TRUE) == TRUE ~ 'R',
+    grepl('Asia', Subjects, ignore.case = TRUE) == TRUE ~ 'D',
+    grepl('China', Subjects, ignore.case = TRUE) == TRUE ~ 'D',
+    grepl('Science', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Government', Subjects, ignore.case = TRUE) == TRUE ~ 'J',
+    grepl('Baker', Subjects, ignore.case = TRUE) == TRUE ~ 'N',
+    grepl('Cooking', Subjects, ignore.case = TRUE) == TRUE ~ 'N',
+    grepl('Law', Subjects, ignore.case = TRUE) == TRUE ~ 'K',
+    grepl('Industry', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Brasil', Subjects, ignore.case = TRUE) == TRUE ~ 'F',
+    grepl('British Columbia', Subjects, ignore.case = TRUE) == TRUE ~ 'F',
+    grepl('Communication', Subjects, ignore.case = TRUE) == TRUE ~ 'P',    
+    grepl('Color', Subjects, ignore.case = TRUE) == TRUE ~ 'N',
+    grepl('Matter', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Employee', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Environment', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Europe', Subjects, ignore.case = TRUE) == TRUE ~ 'D',
+    grepl('Analysis', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Graph', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Politics', Subjects, ignore.case = TRUE) == TRUE ~ 'J',
+    grepl('Compounds', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Market', Subjects, ignore.case = TRUE) == TRUE ~ 'H',
+    grepl('Theory', Subjects, ignore.case = TRUE) == TRUE ~ 'Q',
+    grepl('Plant', Subjects, ignore.case = TRUE) == TRUE ~ 'S',
+    grepl('Social ', Subjects, ignore.case = TRUE) == TRUE ~ 'H',    
+    
+    .default = 'Unknown'
+  ))
+
+assignedLCUnknown
+```
+
+
+
+
+## Replace the Unknown LCs with the Assumed LCs
+
+
+```{r}
+knownLC <- almaData |>
+  filter(`Classification Code` != 'Unknown')
+
+almaDataFixedLC <- rbind(knownLC, assignedLCUnknown)
+```
+
+
+
+
+## Split Cells with Multiple ISSNs or ISBNs
+
+
+```{r}
+almaDataISSN <- almaDataFixedLC |>
+  filter(is.na(ISSN) == FALSE) |>
+  select(Title, `Classification Code`, ISSN) |>
+  distinct()
+
+almaDataISBN <- almaDataFixedLC |>
+  filter(is.na(ISBN) == FALSE) |>
+  select(Title, `Classification Code`, ISBN) |>
+  distinct()
+
+almaDataISSN2 <- almaDataISSN |>
+  select(Title, `Classification Code`, ISSN) 
+
+almaDataISSN2 <- separate_rows(almaDataISSN2, ISSN, sep = ';')
+
+almaDataISSN2 <- almaDataISSN2 |>
+  mutate(ISSN = str_trim(ISSN))
+
+almaDataISBN2 <- almaDataISBN |>
+  select(Title, `Classification Code`, ISBN)
+
+almaDataISBN2 <- separate_rows(almaDataISBN2, ISBN, sep = ';')
+
+almaDataISBN2 <- almaDataISBN2 |>
+  mutate(ISBN = str_trim(ISBN))
+```
+
+
+
+# Load the Title Report
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+TR_ID <- dbGetQuery(con,
+                    "SELECT *
+                    FROM TR_Archive
+                    WHERE Metric_Type == 'Unique_Item_Requests'
+                    AND (Online_ISSN != 'Unknown' OR Print_ISSN != 'Unknown' OR ISBN != 'Unknown')
+                    ORDER BY Title")
+
+
+dim(TR_ID)
+```
+
+# Clean Down to FY Usage Only
+
+```{r}
+TR_ID <- TR_ID |>
+  mutate(FY21 = ifelse(is.na(`Jan-2021`) == TRUE, 0, `Jan-2021`)
+              + ifelse(is.na(`Feb-2021`) == TRUE, 0, `Feb-2021`)
+              + ifelse(is.na(`Mar-2021`) == TRUE, 0, `Mar-2021`)
+              + ifelse(is.na(`Apr-2021`) == TRUE, 0, `Apr-2021`)
+              + ifelse(is.na(`May-2021`) == TRUE, 0, `May-2021`)
+              + ifelse(is.na(`Jun-2021`) == TRUE, 0, `Jun-2021`),
+         FY22 = ifelse(is.na(`Jul-2021`) == TRUE, 0, `Jul-2021`)
+              + ifelse(is.na(`Aug-2021`) == TRUE, 0, `Aug-2021`)
+              + ifelse(is.na(`Sep-2021`) == TRUE, 0, `Sep-2021`)
+              + ifelse(is.na(`Oct-2021`) == TRUE, 0, `Oct-2021`)
+              + ifelse(is.na(`Nov-2021`) == TRUE, 0, `Nov-2021`)
+              + ifelse(is.na(`Dec-2021`) == TRUE, 0, `Dec-2021`)
+              + ifelse(is.na(`Jan-2022`) == TRUE, 0, `Jan-2022`)
+              + ifelse(is.na(`Feb-2022`) == TRUE, 0, `Feb-2022`)
+              + ifelse(is.na(`Mar-2022`) == TRUE, 0, `Mar-2022`)
+              + ifelse(is.na(`Apr-2022`) == TRUE, 0, `Apr-2022`)
+              + ifelse(is.na(`May-2022`) == TRUE, 0, `May-2022`)
+              + ifelse(is.na(`Jun-2022`) == TRUE, 0, `Jun-2022`),
+         FY23 = ifelse(is.na(`Jul-2022`) == TRUE, 0, `Jul-2022`)
+              + ifelse(is.na(`Aug-2022`) == TRUE, 0, `Aug-2022`)
+              + ifelse(is.na(`Sep-2022`) == TRUE, 0, `Sep-2022`)
+              + ifelse(is.na(`Oct-2022`) == TRUE, 0, `Oct-2022`)
+              + ifelse(is.na(`Nov-2022`) == TRUE, 0, `Nov-2022`)
+              + ifelse(is.na(`Dec-2022`) == TRUE, 0, `Dec-2022`)
+              + ifelse(is.na(`Jan-2023`) == TRUE, 0, `Jan-2023`)
+              + ifelse(is.na(`Feb-2023`) == TRUE, 0, `Feb-2023`)
+              + ifelse(is.na(`Mar-2023`) == TRUE, 0, `Mar-2023`)
+              + ifelse(is.na(`Apr-2023`) == TRUE, 0, `Apr-2023`)
+              + ifelse(is.na(`May-2023`) == TRUE, 0, `May-2023`)
+              + ifelse(is.na(`Jun-2023`) == TRUE, 0, `Jun-2023`),
+         FY24 = ifelse(is.na(`Jul-2023`) == TRUE, 0, `Jul-2023`)
+              + ifelse(is.na(`Aug-2023`) == TRUE, 0, `Aug-2023`)
+              + ifelse(is.na(`Sep-2023`) == TRUE, 0, `Sep-2023`)
+              + ifelse(is.na(`Oct-2023`) == TRUE, 0, `Oct-2023`)
+              + ifelse(is.na(`Nov-2023`) == TRUE, 0, `Nov-2023`)
+              + ifelse(is.na(`Dec-2023`) == TRUE, 0, `Dec-2023`)
+              + ifelse(is.na(`Jan-2024`) == TRUE, 0, `Jan-2024`)
+              + ifelse(is.na(`Feb-2024`) == TRUE, 0, `Feb-2024`)
+              + ifelse(is.na(`Mar-2024`) == TRUE, 0, `Mar-2024`)
+              + ifelse(is.na(`Apr-2024`) == TRUE, 0, `Apr-2024`)
+              + ifelse(is.na(`May-2024`) == TRUE, 0, `May-2024`)
+              + ifelse(is.na(`Jun-2024`) == TRUE, 0, `Jun-2024`),
+         FY25 = ifelse(is.na(`Jul-2024`) == TRUE, 0, `Jul-2024`)
+              + ifelse(is.na(`Aug-2024`) == TRUE, 0, `Aug-2024`)
+              + ifelse(is.na(`Sep-2024`) == TRUE, 0, `Sep-2024`)
+              + ifelse(is.na(`Oct-2024`) == TRUE, 0, `Oct-2024`)
+              + ifelse(is.na(`Nov-2024`) == TRUE, 0, `Nov-2024`)
+              + ifelse(is.na(`Dec-2024`) == TRUE, 0, `Dec-2024`)
+              + ifelse(is.na(`Jan-2025`) == TRUE, 0, `Jan-2025`)
+              + ifelse(is.na(`Feb-2025`) == TRUE, 0, `Feb-2025`)
+              + ifelse(is.na(`Mar-2025`) == TRUE, 0, `Mar-2025`)
+              + ifelse(is.na(`Apr-2025`) == TRUE, 0, `Apr-2025`)
+              + ifelse(is.na(`May-2025`) == TRUE, 0, `May-2025`)
+              + ifelse(is.na(`Jun-2025`) == TRUE, 0, `Jun-2025`),
+         FY26 = ifelse(is.na(`Jul-2025`) == TRUE, 0, `Jul-2025`)
+              + ifelse(is.na(`Aug-2025`) == TRUE, 0, `Aug-2025`)
+              + ifelse(is.na(`Sep-2025`) == TRUE, 0, `Sep-2025`)
+              + ifelse(is.na(`Oct-2025`) == TRUE, 0, `Oct-2025`)
+              + ifelse(is.na(`Nov-2025`) == TRUE, 0, `Nov-2025`)
+              + ifelse(is.na(`Dec-2025`) == TRUE, 0, `Dec-2025`)) |>
+  select(Title, Online_ISSN, Print_ISSN, ISBN, Vendor, FY21, FY22, FY23, FY24, FY25, FY26, Reporting_Period_Total, index)
+
+
+```
+
+
+
+# Attempt to Join the Two
+
+
+```{r, warning = FALSE}
+joinedE <- inner_join(TR_ID, almaDataISSN2, by = c('Online_ISSN' = 'ISSN')) |>
+  distinct()
+
+joinedP <- inner_join(TR_ID, almaDataISSN2, by = c('Print_ISSN' = 'ISSN')) |>
+  distinct()
+
+TR_ID$ISBN <- gsub('-', '', TR_ID$ISBN, fixed = TRUE)
+
+
+joinedISBN <- inner_join(TR_ID, almaDataISBN2, by = c('ISBN' = 'ISBN')) |>
+  distinct()
+
+joined <- rbind(joinedE, joinedP, joinedISBN) |>
+  distinct() |>
+  mutate(Row_ID = row_number())
+
+joined
+```
+
+
+
+# Remove Duplicated Indexes in the Joined File
+
+Some of the Alma holdings have ISBN or ISSN leakage, causing multiple titles and multiple LC codes to bleed into one usage line. Using fuzzy matching for the titles, the most likely match for these titles will be used to assign a single LC code for each title.
+
+
+## Find Double Row Candidates
+
+
+```{r}
+joinedDoubleIndex <- joined |>
+  group_by(index) |>
+  summarise(n = n()) |>
+  filter(n > 1)
+
+joinedDoubleIndex
+```
+
+
+## Remove Wrong Lines
+
+
+```{r}
+ for(i in 1:length(unique(joinedDoubleIndex$index))){
+   
+   if(joinedDoubleIndex$index[i] == 68394){ #This is a known odd index and should be skipped
+     next
+   } 
+
+   if(i %% 2500 == 0){
+     print(i)
+   }
+
+   options <- joined |>
+     filter(index == joinedDoubleIndex$index[i])
+
+   titleName <- options$Title.x[1]
+
+   matchTest <- GetCloseMatches(string = titleName, sequence_strings = options$Title.y, n = 1L, cutoff = 0.01)
+
+   removeLines <- options |>
+     filter(Title.y != matchTest)
+   
+   joined <- joined |>
+     filter(!Row_ID %in% removeLines$Row_ID)
+ }
+```
+
+
+
+## Remove the True Duplicates
+
+For the titles with two exact copies, the last row's LC code will be chosen.
+
+
+```{r}
+ for(i in 1:length(unique(joinedDoubleIndex$index))){
+
+   if(i %% 1000 == 0){
+     print(i)
+   }
+
+   options <- joined |>
+     filter(index == joinedDoubleIndex$index[i])
+   
+   removeLines <- head(options, 1)
+   
+   joined <- joined |>
+     filter(!Row_ID %in% removeLines$Row_ID)
+ }
+```
+
+
+
+```{r}
+write_xlsx(joined, 'De-Duplicated Joined Titles With Fiscal Year Usage.xlsx')
+```
+
+
+## Find the Missing LC Titles
+
+
+These titles have usage, but were not joined to an Alma holding. This represents 324,957 uses.
+
+
+```{r, warning = FALSE}
+usageJoinMisses <- TR_ID |>
+  filter(!index %in% joined$index) |>
+  select(Title, Vendor, Online_ISSN, Print_ISSN, ISBN, FY21, FY22, FY23, FY24, FY25, FY26, Reporting_Period_Total) |>
+  mutate(`Classification Code` = 'Not Available')
+
+colnames(usageJoinMisses) <- c('Title', 'Vendor', 'Online_ISSN', 'Print_ISSN', 'ISBN', 'FY21', 'FY22', 'FY23', 'FY24', 'FY25', 'FY26', 'Reporting_Period_Total', 'Classification Code')
+
+usageJoinMisses
+```
+
+
+
+```{r}
+test <- usageJoinMisses |>
+  group_by(Vendor) |>
+  summarise(n = n()) |>
+  arrange(desc(n))
+
+test
+```
+
+
+
+# Find the Titles with No Identifiers
+
+
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+TR_No_ID <- dbGetQuery(con,
+                    "SELECT *
+                    FROM TR_Archive
+                    WHERE Metric_Type == 'Unique_Item_Requests'
+                    AND Online_ISSN == 'Unknown' AND Print_ISSN == 'Unknown' AND ISBN == 'Unknown'
+                    ORDER BY Title")
+
+
+dim(TR_No_ID)
+```
+
+
+
+# Clean Down to FY Usage Only
+
+```{r}
+TR_No_ID <- TR_No_ID |>
+  mutate(FY21 = ifelse(is.na(`Jan-2021`) == TRUE, 0, `Jan-2021`)
+              + ifelse(is.na(`Feb-2021`) == TRUE, 0, `Feb-2021`)
+              + ifelse(is.na(`Mar-2021`) == TRUE, 0, `Mar-2021`)
+              + ifelse(is.na(`Apr-2021`) == TRUE, 0, `Apr-2021`)
+              + ifelse(is.na(`May-2021`) == TRUE, 0, `May-2021`)
+              + ifelse(is.na(`Jun-2021`) == TRUE, 0, `Jun-2021`),
+         FY22 = ifelse(is.na(`Jul-2021`) == TRUE, 0, `Jul-2021`)
+              + ifelse(is.na(`Aug-2021`) == TRUE, 0, `Aug-2021`)
+              + ifelse(is.na(`Sep-2021`) == TRUE, 0, `Sep-2021`)
+              + ifelse(is.na(`Oct-2021`) == TRUE, 0, `Oct-2021`)
+              + ifelse(is.na(`Nov-2021`) == TRUE, 0, `Nov-2021`)
+              + ifelse(is.na(`Dec-2021`) == TRUE, 0, `Dec-2021`)
+              + ifelse(is.na(`Jan-2022`) == TRUE, 0, `Jan-2022`)
+              + ifelse(is.na(`Feb-2022`) == TRUE, 0, `Feb-2022`)
+              + ifelse(is.na(`Mar-2022`) == TRUE, 0, `Mar-2022`)
+              + ifelse(is.na(`Apr-2022`) == TRUE, 0, `Apr-2022`)
+              + ifelse(is.na(`May-2022`) == TRUE, 0, `May-2022`)
+              + ifelse(is.na(`Jun-2022`) == TRUE, 0, `Jun-2022`),
+         FY23 = ifelse(is.na(`Jul-2022`) == TRUE, 0, `Jul-2022`)
+              + ifelse(is.na(`Aug-2022`) == TRUE, 0, `Aug-2022`)
+              + ifelse(is.na(`Sep-2022`) == TRUE, 0, `Sep-2022`)
+              + ifelse(is.na(`Oct-2022`) == TRUE, 0, `Oct-2022`)
+              + ifelse(is.na(`Nov-2022`) == TRUE, 0, `Nov-2022`)
+              + ifelse(is.na(`Dec-2022`) == TRUE, 0, `Dec-2022`)
+              + ifelse(is.na(`Jan-2023`) == TRUE, 0, `Jan-2023`)
+              + ifelse(is.na(`Feb-2023`) == TRUE, 0, `Feb-2023`)
+              + ifelse(is.na(`Mar-2023`) == TRUE, 0, `Mar-2023`)
+              + ifelse(is.na(`Apr-2023`) == TRUE, 0, `Apr-2023`)
+              + ifelse(is.na(`May-2023`) == TRUE, 0, `May-2023`)
+              + ifelse(is.na(`Jun-2023`) == TRUE, 0, `Jun-2023`),
+         FY24 = ifelse(is.na(`Jul-2023`) == TRUE, 0, `Jul-2023`)
+              + ifelse(is.na(`Aug-2023`) == TRUE, 0, `Aug-2023`)
+              + ifelse(is.na(`Sep-2023`) == TRUE, 0, `Sep-2023`)
+              + ifelse(is.na(`Oct-2023`) == TRUE, 0, `Oct-2023`)
+              + ifelse(is.na(`Nov-2023`) == TRUE, 0, `Nov-2023`)
+              + ifelse(is.na(`Dec-2023`) == TRUE, 0, `Dec-2023`)
+              + ifelse(is.na(`Jan-2024`) == TRUE, 0, `Jan-2024`)
+              + ifelse(is.na(`Feb-2024`) == TRUE, 0, `Feb-2024`)
+              + ifelse(is.na(`Mar-2024`) == TRUE, 0, `Mar-2024`)
+              + ifelse(is.na(`Apr-2024`) == TRUE, 0, `Apr-2024`)
+              + ifelse(is.na(`May-2024`) == TRUE, 0, `May-2024`)
+              + ifelse(is.na(`Jun-2024`) == TRUE, 0, `Jun-2024`),
+         FY25 = ifelse(is.na(`Jul-2024`) == TRUE, 0, `Jul-2024`)
+              + ifelse(is.na(`Aug-2024`) == TRUE, 0, `Aug-2024`)
+              + ifelse(is.na(`Sep-2024`) == TRUE, 0, `Sep-2024`)
+              + ifelse(is.na(`Oct-2024`) == TRUE, 0, `Oct-2024`)
+              + ifelse(is.na(`Nov-2024`) == TRUE, 0, `Nov-2024`)
+              + ifelse(is.na(`Dec-2024`) == TRUE, 0, `Dec-2024`)
+              + ifelse(is.na(`Jan-2025`) == TRUE, 0, `Jan-2025`)
+              + ifelse(is.na(`Feb-2025`) == TRUE, 0, `Feb-2025`)
+              + ifelse(is.na(`Mar-2025`) == TRUE, 0, `Mar-2025`)
+              + ifelse(is.na(`Apr-2025`) == TRUE, 0, `Apr-2025`)
+              + ifelse(is.na(`May-2025`) == TRUE, 0, `May-2025`)
+              + ifelse(is.na(`Jun-2025`) == TRUE, 0, `Jun-2025`),
+         FY26 = ifelse(is.na(`Jul-2025`) == TRUE, 0, `Jul-2025`)
+              + ifelse(is.na(`Aug-2025`) == TRUE, 0, `Aug-2025`)
+              + ifelse(is.na(`Sep-2025`) == TRUE, 0, `Sep-2025`)
+              + ifelse(is.na(`Oct-2025`) == TRUE, 0, `Oct-2025`)
+              + ifelse(is.na(`Nov-2025`) == TRUE, 0, `Nov-2025`)
+              + ifelse(is.na(`Dec-2025`) == TRUE, 0, `Dec-2025`)) |>
+  select(Title, Vendor, Online_ISSN, Print_ISSN, ISBN, FY21, FY22, FY23, FY24, FY25, FY26, Reporting_Period_Total) |>
+  mutate(`Classification Code` = 'Not Available')
+
+colnames(TR_No_ID) <- c('Title', 'Vendor', 'Online_ISSN', 'Print_ISSN', 'ISBN', 'FY21', 'FY22', 'FY23', 'FY24', 'FY25', 'FY26', 'Reporting_Period_Total', 'Classification Code')
+```
+
+
+
+
+
+## Assign LC Codes for Subject-Specific Vendors
+
+For the remaining Unknown LC items from Alma, and the usage with no identifiers at all, some may be able to be estimated based on its vendor. Vendors whose publishing areas are only in one LC letter can be generally assigned to that letter.
+
+For example, IEEE (the Institute of Electrical and Electronics Engineers) is fully focused on the T LC codes, so we can generalize its usage to being a T vendor.
+
+
+
+```{r}
+joinedNotUnknown <- joined |>
+  filter(`Classification Code` != 'Unknown') |>
+  select(Title.x, Vendor, Online_ISSN, Print_ISSN, ISBN, FY21, FY22, FY23, FY24, FY25, FY26, Reporting_Period_Total, `Classification Code`) |>
+  distinct()
+
+colnames(joinedNotUnknown) <- c('Title', 'Vendor', 'Online_ISSN', 'Print_ISSN', 'ISBN', 'FY21', 'FY22', 'FY23', 'FY24', 'FY25', 'FY26', 'Reporting_Period_Total', 'Classification Code')
+```
+
+
+### Get the Vendors with Unknown LCs, No Joins, and No Identifiers
+
+```{r}
+joinedUnknown <- joined |>
+  filter(`Classification Code` == 'Unknown') |>
+  select(Title.x, Vendor, Online_ISSN, Print_ISSN, ISBN, FY21, FY22, FY23, FY24, FY25, FY26, Reporting_Period_Total, `Classification Code`)
+
+colnames(joinedUnknown) <- c('Title', 'Vendor', 'Online_ISSN', 'Print_ISSN', 'ISBN', 'FY21', 'FY22', 'FY23', 'FY24', 'FY25', 'FY26', 'Reporting_Period_Total', 'Classification Code')
+
+
+allMissingTitles <- rbind(TR_No_ID, usageJoinMisses, joinedUnknown)
+
+allMissingTitles
+```
+
+
+```{r}
+missingTitleLC <- allMissingTitles |>
+  mutate(`Classification Code` = case_when(
+    Vendor == 'IEEE' ~ 'T',
+    Vendor == 'AMS' ~ 'Q',
+    Vendor == 'AIAA' ~ 'Q',
+    Vendor == 'AccessEngineering' ~ 'T',
+    Vendor == 'CABIntl' ~ 'S',
+    Vendor == 'RSC' ~ 'Q',
+    Vendor == 'ASME' ~ 'T',
+    Vendor == 'ASMIntl' ~ 'T',
+    Vendor == 'SIAM' ~ 'Q',
+    Vendor == 'ASCE' ~ 'T',
+    Vendor == 'Karger' ~ 'R',
+    Vendor == 'Thieme' ~ 'R',
+    Vendor == 'AccessMedicine' ~ 'R',
+    Vendor == 'DramaOnline' ~ 'N',
+    Vendor == 'PsychOnline' ~ 'R',
+    Vendor == 'ACS' ~ 'Q',
+    Vendor == 'ACM' ~ 'T',
+    Vendor == 'JPSJ' ~ 'Q',
+    Vendor == 'AIPScitation' ~ 'Q',
+    Vendor == 'Scientific' ~ 'T',
+    Vendor == 'Rotunda' ~ 'E',
+    Vendor == 'AmPhytoSoc' ~ 'Q',
+    Vendor == 'MSP' ~ 'Q',
+    Vendor == 'JAMA' ~ 'R',
+    Vendor == 'JSTAGE' ~ 'R',
+    Vendor == 'JBE' ~ 'P',
+    Vendor == 'AAPediatrics' ~ 'R',
+    Vendor == 'APHA' ~ 'R',
+    Vendor == 'CSP' ~ 'Q',
+    Vendor == 'OvidSP' ~ 'R',
+    Vendor == 'CSIRO' ~ 'Q',
+    Vendor == 'APA' ~ 'R',
+    Vendor == 'AAAS' ~ 'Q',
+    Vendor == 'APS' ~ 'Q',
+    Vendor == 'AmerPhysicalSoc' ~ 'Q',
+    Vendor == 'NEJM' ~ 'R',
+    Vendor == 'Diabetes' ~ 'R',
+    Vendor == 'GSP' ~ 'G',
+    Vendor == 'PhilDocCenter' ~ 'B',
+    Vendor == 'Slack' ~ 'R',
+    .default = 'Unknown'
+  ))
+
+missingTitleLC
+```
+
+
+## Fill in Highly-Used Titles
+
+Some highly used titles, especially newspapers, can be fit into an LC classification to further cut down on the Unknown tier.
+
+
+```{r}
+unknownTitles <- missingTitleLC2 |>
+  filter(`Classification Code` == 'Unknown')
+
+unknownTitles
+```
+
+
+```{r}
+missingTitleLC2 <- missingTitleLC |>
+  mutate(`Classification Code` = case_when(
+    Title == 'Oxford English Dictionary' ~ 'A',
+    Title == 'A Course in Mathematical Modeling' ~ 'Q',
+    Title == 'A Critical Introduction to the Study of Religion' ~ 'B',
+    Title == 'Clinical Small Animal Internal Medicine' ~ 'R',
+    Title == 'PLOS Pathogens' ~ 'R',
+    Title == 'PLOS Computational Biology' ~ 'R',
+    Title == 'PLOS Genetics' ~ 'R',
+    Title == 'PLOS Biology' ~ 'R',
+    Title == 'Government and Politics in Tennessee' ~ 'J',
+    Title == 'Toxic Plants of North America, Second Edition' ~ 'S',
+    Title == 'PLOS Medicine' ~ 'R',
+    .default = `Classification Code`
+  ))
+```
+
+
+```{r}
+test <- missingTitleLC2 |>
+  group_by(`Classification Code`) |>
+  summarise(Titles = n(),
+            Usage = sum(Reporting_Period_Total))
+
+test
+```
+
+
+```{r}
+allTitles <- rbind(joinedNotUnknown, missingTitleLC2) |>
+  distinct()
+
+allTitles
+```
+
+
+
+
+
+```{r}
+write_xlsx(allTitles, 'LC Codes for All Electronic Usage Archive with FY Usage.xlsx')
+```
+
+
+
+# Get Confirmed Usage by LC Code
+
+
+```{r}
+lcUsage <- allTitles |>
+  group_by(`Classification Code`) |>
+  summarise(Titles_Found = length(unique(Title)),
+            FY21 = round(sum(FY21), 0),
+            FY22 = round(sum(FY22), 0),
+            FY23 = round(sum(FY23), 0),
+            FY24 = round(sum(FY24), 0),
+            FY25 = round(sum(FY25), 0),
+            FY26 = round(sum(FY26), 0),
+            Reporting_Period_Total = round(sum(Reporting_Period_Total), 0)) |>
+  arrange(`Classification Code`)
+
+lcUsage
+```
+
+
+# Get Confirmed Usage by LC Letter
+
+
+```{r}
+lcLetterUsage <- allTitles |>
+  mutate(`Classification Letter` = ifelse(`Classification Code` != 'Unknown', substr(`Classification Code`, 1, 1), 'Unknown')) |>
+  group_by(`Classification Letter`) |>
+  summarise(Titles_Found = length(unique(Title)),
+            FY21 = round(sum(FY21), 0),
+            FY22 = round(sum(FY22), 0),
+            FY23 = round(sum(FY23), 0),
+            FY24 = round(sum(FY24), 0),
+            FY25 = round(sum(FY25), 0),
+            FY26 = round(sum(FY26), 0),
+            Last_5_Years_Usage = round(sum(Reporting_Period_Total), 0)) |>
+  arrange(`Classification Letter`) |>
+  mutate(Last_5_Years_Usage = ifelse(`Classification Letter` == 'Unknown', Last_5_Years_Usage + 38, Last_5_Years_Usage),
+         FY21 = ifelse(`Classification Letter` == 'Unknown', FY21 + 4, FY21),
+         FY22 = ifelse(`Classification Letter` == 'Unknown', FY22 + 8, FY22),
+         FY23 = ifelse(`Classification Letter` == 'Unknown', FY23 + 8, FY23),
+         FY24 = ifelse(`Classification Letter` == 'Unknown', FY24 + 8, FY24),
+         FY25 = ifelse(`Classification Letter` == 'Unknown', FY25 + 8, FY25),
+         FY26 = ifelse(`Classification Letter` == 'Unknown', FY26 + 4, FY26))
+
+
+lcLetterUsage
+```
+
+
+
+```{r}
+write_xlsx(lcLetterUsage, 'Last Five Years Unique Item Requests by LC Code and Fiscal Year.xlsx')
+```
+
+
+
+
