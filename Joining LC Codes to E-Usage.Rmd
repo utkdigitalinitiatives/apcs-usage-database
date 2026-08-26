@@ -11,6 +11,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 
+This file finds the LC codes for as many titles with e-usage as possible. 
+
+
 ```{r, warning = FALSE}
 reticulate::py_config()
 library(readxl)
@@ -27,12 +30,18 @@ library(fuzzywuzzyR)
 
 # Load the Alma Data
 
-```{r}
-almaData1 <- read_excel('Alma Electronic Collection ISSNs and ISBNs for Usage Joining Part 1.xlsx') 
 
-almaData2 <- read_excel('Alma Electronic Collection ISSNs and ISBNs for Usage Joining Part 2.xlsx')
+The data in these two Excel files can be found in the Alma Analytics files of the same name. They are split into two files, since an Excel file is not large enough to fit all rows.
 
-almaData <- rbind(almaData1, almaData2)
+```{r, warning = FALSE}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\One-Off Usage Analysis\\Adding LC Codes to Usage') #Set this to the data's location on your local computer!
+
+almaData1 <- read_excel('Alma Electronic Collection ISSNs and ISBNs for Usage Joining Part 1 Aug 2026.xlsx') 
+
+almaData2 <- read_excel('Alma Electronic Collection ISSNs and ISBNs for Usage Joining Part 2 Aug 2026.xlsx')
+
+almaData <- rbind(almaData1, almaData2) |>
+  distinct()
 ```
 
 
@@ -56,7 +65,7 @@ almaUnknown
 
 ## Assign LC Codes by Subject
 
-
+As new subjects appear or as new information on how to assign certain subjects is figured out, add or edit grepl() statements in the block below. LC codes are assigned in the order they appear below, so make sure all confident assignments are close to the top.
 
 
 ```{r}
@@ -293,14 +302,18 @@ almaDataFixedLC <- rbind(knownLC, assignedLCUnknown)
 ## Split Cells with Multiple ISSNs or ISBNs
 
 
+This is so the ISSN/ISBNs can be joined together.
+
 ```{r}
 almaDataISSN <- almaDataFixedLC |>
   filter(is.na(ISSN) == FALSE) |>
+  mutate(ISSN = str_replace_all(ISSN, "-", "")) |>
   select(Title, `Classification Code`, ISSN) |>
   distinct()
 
 almaDataISBN <- almaDataFixedLC |>
   filter(is.na(ISBN) == FALSE) |>
+  mutate(ISBN = str_replace_all(ISBN, "-", "")) |>
   select(Title, `Classification Code`, ISBN) |>
   distinct()
 
@@ -325,6 +338,8 @@ almaDataISBN2 <- almaDataISBN2 |>
 
 # Load the Title Report
 
+This will use the TR_Archive report from the Big Usage Database.
+
 ```{r}
 con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
 
@@ -340,6 +355,8 @@ dim(TR_ID)
 ```
 
 # Clean Down to FY Usage Only
+
+FOR EACH NEW SEMESTER, add new months (and a new FY column if needed) to ensure accurate data.
 
 ```{r}
 TR_ID <- TR_ID |>
@@ -402,7 +419,13 @@ TR_ID <- TR_ID |>
               + ifelse(is.na(`Sep-2025`) == TRUE, 0, `Sep-2025`)
               + ifelse(is.na(`Oct-2025`) == TRUE, 0, `Oct-2025`)
               + ifelse(is.na(`Nov-2025`) == TRUE, 0, `Nov-2025`)
-              + ifelse(is.na(`Dec-2025`) == TRUE, 0, `Dec-2025`)) |>
+              + ifelse(is.na(`Dec-2025`) == TRUE, 0, `Dec-2025`)
+              + ifelse(is.na(`Jan-2026`) == TRUE, 0, `Jan-2026`)
+              + ifelse(is.na(`Feb-2026`) == TRUE, 0, `Feb-2026`)
+              + ifelse(is.na(`Mar-2026`) == TRUE, 0, `Mar-2026`)
+              + ifelse(is.na(`Apr-2026`) == TRUE, 0, `Apr-2026`)
+              + ifelse(is.na(`May-2026`) == TRUE, 0, `May-2026`)
+              + ifelse(is.na(`Jun-2026`) == TRUE, 0, `Jun-2026`)) |>
   select(Title, Online_ISSN, Print_ISSN, ISBN, Vendor, FY21, FY22, FY23, FY24, FY25, FY26, Reporting_Period_Total, index)
 
 
@@ -410,7 +433,7 @@ TR_ID <- TR_ID |>
 
 
 
-# Attempt to Join the Two
+# Join the Alma holdings to the Usage
 
 
 ```{r, warning = FALSE}
@@ -419,9 +442,6 @@ joinedE <- inner_join(TR_ID, almaDataISSN2, by = c('Online_ISSN' = 'ISSN')) |>
 
 joinedP <- inner_join(TR_ID, almaDataISSN2, by = c('Print_ISSN' = 'ISSN')) |>
   distinct()
-
-TR_ID$ISBN <- gsub('-', '', TR_ID$ISBN, fixed = TRUE)
-
 
 joinedISBN <- inner_join(TR_ID, almaDataISBN2, by = c('ISBN' = 'ISBN')) |>
   distinct()
@@ -455,14 +475,16 @@ joinedDoubleIndex
 
 ## Remove Wrong Lines
 
+This may take many minutes (even upwards of multiple hours depending on length) to finish. R will continue to run even if the computer is in sleep mode, but you will not be able to run any other R code (and this may also take up significant RAM).
 
 ```{r}
  for(i in 1:length(unique(joinedDoubleIndex$index))){
-   
-   if(joinedDoubleIndex$index[i] == 68394){ #This is a known odd index and should be skipped
-     next
-   } 
 
+   if(joinedDoubleIndex$index[i] == 72411){ #This is a known error that can be skipped - the exact number might change with each semester, so keep this in mind
+     next
+   }
+   
+   
    if(i %% 2500 == 0){
      print(i)
    }
@@ -482,12 +504,24 @@ joinedDoubleIndex
  }
 ```
 
+Once this code block is run, stop! Run the joinedDoubleIndex block again. That way, there won't be any time lost to duplicated work in the next cleaning step.
+
+
+```{r}
+joinedDoubleIndex <- joined |>
+  group_by(index) |>
+  summarise(n = n()) |>
+  filter(n > 1)
+
+joinedDoubleIndex
+```
 
 
 ## Remove the True Duplicates
 
-For the titles with two exact copies, the last row's LC code will be chosen.
+For the titles with two exact copies, the last row's LC code will be chosen to stay consistent. This will be applied to all titles whose fuzzy match did not produce a clear winner (make sure the above cells have finished before running this).
 
+This may also take several minutes to run, but should be much shorter than the first block.
 
 ```{r}
  for(i in 1:length(unique(joinedDoubleIndex$index))){
@@ -507,16 +541,33 @@ For the titles with two exact copies, the last row's LC code will be chosen.
 ```
 
 
+Before continuing, make sure that all doubled indexes have just one row remaining. If you run this block below and see more than 0 rows in joinedDoubleIndex, then run the above cell block again until there are 0 remaining.
 
 ```{r}
-write_xlsx(joined, 'De-Duplicated Joined Titles With Fiscal Year Usage.xlsx')
+joinedDoubleIndex <- joined |>
+  group_by(index) |>
+  summarise(n = n()) |>
+  filter(n > 1)
+
+joinedDoubleIndex
+```
+
+
+## Export the Data
+
+Make sure this is only run once the above cell returns a 0-row data table.
+
+```{r, warning = FALSE}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\One-Off Usage Analysis\\Adding LC Codes to Usage')
+
+write_xlsx(joined, 'De-Duplicated Joined Titles With Fiscal Year Usage Aug 2026.xlsx')
 ```
 
 
 ## Find the Missing LC Titles
 
 
-These titles have usage, but were not joined to an Alma holding. This represents 324,957 uses.
+These titles have usage, but were not joined to an Alma holding. These will be treated as no-information titles in the Unknown section to attempt to catch their LC code.
 
 
 ```{r, warning = FALSE}
@@ -532,19 +583,10 @@ usageJoinMisses
 
 
 
-```{r}
-test <- usageJoinMisses |>
-  group_by(Vendor) |>
-  summarise(n = n()) |>
-  arrange(desc(n))
-
-test
-```
-
-
-
 # Find the Titles with No Identifiers
 
+
+These titles have usage with no ISBN nor ISSN information. We can attempt to assume their LC code based on their vendor or key words within their titles.
 
 
 ```{r}
@@ -564,6 +606,9 @@ dim(TR_No_ID)
 
 
 # Clean Down to FY Usage Only
+
+
+FOR EACH NEW SEMESTER, do the same thing as the similar TR_ID block above.
 
 ```{r}
 TR_No_ID <- TR_No_ID |>
@@ -626,7 +671,13 @@ TR_No_ID <- TR_No_ID |>
               + ifelse(is.na(`Sep-2025`) == TRUE, 0, `Sep-2025`)
               + ifelse(is.na(`Oct-2025`) == TRUE, 0, `Oct-2025`)
               + ifelse(is.na(`Nov-2025`) == TRUE, 0, `Nov-2025`)
-              + ifelse(is.na(`Dec-2025`) == TRUE, 0, `Dec-2025`)) |>
+              + ifelse(is.na(`Dec-2025`) == TRUE, 0, `Dec-2025`)
+              + ifelse(is.na(`Jan-2026`) == TRUE, 0, `Jan-2026`)
+              + ifelse(is.na(`Feb-2026`) == TRUE, 0, `Feb-2026`)
+              + ifelse(is.na(`Mar-2026`) == TRUE, 0, `Mar-2026`)
+              + ifelse(is.na(`Apr-2026`) == TRUE, 0, `Apr-2026`)
+              + ifelse(is.na(`May-2026`) == TRUE, 0, `May-2026`)
+              + ifelse(is.na(`Jun-2026`) == TRUE, 0, `Jun-2026`)) |>
   select(Title, Vendor, Online_ISSN, Print_ISSN, ISBN, FY21, FY22, FY23, FY24, FY25, FY26, Reporting_Period_Total) |>
   mutate(`Classification Code` = 'Not Available')
 
@@ -670,6 +721,11 @@ allMissingTitles <- rbind(TR_No_ID, usageJoinMisses, joinedUnknown)
 allMissingTitles
 ```
 
+
+
+## Assign LC Codes to the allMissingTitles
+
+As new vendors appear or need to be edited, add or edit rows in the case_when() statement below.
 
 ```{r}
 missingTitleLC <- allMissingTitles |>
@@ -723,15 +779,7 @@ missingTitleLC
 
 ## Fill in Highly-Used Titles
 
-Some highly used titles, especially newspapers, can be fit into an LC classification to further cut down on the Unknown tier.
-
-
-```{r}
-unknownTitles <- missingTitleLC2 |>
-  filter(`Classification Code` == 'Unknown')
-
-unknownTitles
-```
+Some highly used titles, especially newspapers, can be fit into an LC classification to further cut down on the Unknown tier. These can be added as much as desired for increased accuracy, but some level of inaccuracy will exist unless all titles are manually input (which is perfectly fine - make sure to say as such if using this code in reporting).
 
 
 ```{r}
@@ -753,31 +801,52 @@ missingTitleLC2 <- missingTitleLC |>
 ```
 
 
+
+```{r}
+unknownTitles <- missingTitleLC2 |>
+  filter(`Classification Code` == 'Unknown')
+
+unknownTitles
+```
+
+## Check for Usage in the Unknown Tier
+
+This is where you can check how much Unknown usage remains. A rate of under 10% of the total is usually solid enough for general reporting, unless told otherwise.
+
 ```{r}
 test <- missingTitleLC2 |>
   group_by(`Classification Code`) |>
   summarise(Titles = n(),
             Usage = sum(Reporting_Period_Total))
 
-test
+sum(test$Usage)
 ```
 
 
+# Get all Titles Back Together
+
 ```{r}
 allTitles <- rbind(joinedNotUnknown, missingTitleLC2) |>
-  distinct()
+  distinct() |>
+  mutate(TopClassification = ifelse(`Classification Code` == 'Unknown', 'Unknown', substr(`Classification Code`, 1, 1)))
 
 allTitles
 ```
 
 
+## Save the Usage with LC to Excel and the Database
 
 
+```{r, warning = FALSE}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\One-Off Usage Analysis\\Adding LC Codes to Usage') #Set this also to where you want the data to be saved on your computer!
 
-```{r}
 write_xlsx(allTitles, 'LC Codes for All Electronic Usage Archive with FY Usage.xlsx')
+
+dbWriteTable(con, 'TR_Archive_Usage_by_LC', allTitles, overwrite = TRUE)
 ```
 
+
+Using the new TR_Archive_Usage_by_LC table, update the PowerBI's Usage by LC Code page. If you need only one-shot information, continue below.
 
 
 # Get Confirmed Usage by LC Code
@@ -829,8 +898,13 @@ lcLetterUsage
 ```
 
 
+# Save the Usage by LC Code
 
-```{r}
+If you need to only share an Excel file with this information, use this to save it.
+
+```{r, warning = FALSE}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\One-Off Usage Analysis\\Adding LC Codes to Usage') #The data will be saved to this folder again!
+
 write_xlsx(lcLetterUsage, 'Last Five Years Unique Item Requests by LC Code and Fiscal Year.xlsx')
 ```
 
