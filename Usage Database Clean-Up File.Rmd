@@ -1,0 +1,679 @@
+---
+title: "Usage Database Clean-Up"
+author: "Alexander Harriman"
+date: "2026-09-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r, warning = FALSE}
+library(dplyr)
+library(RSQLite)
+library(fuzzywuzzyR)
+library(writexl)
+```
+
+
+
+# Combine No-ISSN and ISSN Rows for the Same Title
+
+Some titles have two rows for each title/metric type combination: one with an ISSN and one with ISSN "Unknown". This cell fills in the Unknown ISSNs and de-duplicates the rows.
+
+
+## TR_J3
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+TR_J3_Raw <- dbGetQuery(con,
+                    "SELECT *
+                    FROM TR_J3_Raw") |>
+  mutate(rowCode = paste(Title, Access_Type, Vendor, Metric_Type))
+
+
+```
+
+
+
+### Find the Number of Rows per Title by Online_ISSN type
+
+Each title eligible should have two titles per metric type, one with an Online_ISSN and one without.
+
+
+```{r}
+dupeCheck <- TR_J3_Raw |>
+  filter(Title != 'Unknown') |>
+  group_by(rowCode) |>
+  summarise(rowCount = n(),
+            unknownOnlineISSN = sum(ifelse(Online_ISSN == 'Unknown', 1, 0)),
+            unknownPrintISSN = sum(ifelse(Print_ISSN == 'Unknown', 1, 0))) |>
+  filter(rowCount > 1) |>
+  ungroup() |>
+  arrange(desc(rowCount))
+
+dupeCheck
+```
+
+
+### Fill in the Gaps
+
+
+```{r}
+TR_J3_Candidates <- TR_J3_Raw |>
+  filter(rowCode %in% dupeCheck$rowCode)
+
+uniqueRowCodes <- unique(TR_J3_Candidates$rowCode)
+
+TR_J3_Filled <- data.frame()
+
+for(i in 1:length(uniqueRowCodes)){
+  if(i %% 1000 == 0){
+    print(i)
+  }
+  
+  candidateRows <- TR_J3_Candidates |>
+    filter(rowCode == uniqueRowCodes[i])
+  
+  # Online_ISSN
+  if(any(candidateRows$Online_ISSN != 'Unknown')){
+    correctOnlineISSN <- candidateRows |>
+      filter(Online_ISSN != 'Unknown')
+    
+    if(length(unique(correctOnlineISSN$Online_ISSN)) > 1){
+      cleanRows <- candidateRows
+    }
+    else{
+      fillInOnline <- correctOnlineISSN$Online_ISSN[1] 
+      
+      cleanRows <- candidateRows |>
+        mutate(Online_ISSN = fillInOnline)
+    }
+  }
+  else{
+    cleanRows <- candidateRows
+  }
+  
+  # Print_ISSN
+  if(any(cleanRows$Print_ISSN != 'Unknown')){
+    correctPrintISSN <- cleanRows |>
+      filter(Print_ISSN != 'Unknown')
+    
+    if(length(unique(correctPrintISSN$Print_ISSN)) > 1){
+      cleanRows <- cleanRows
+    }
+    else{
+      fillInPrint <- correctPrintISSN$Print_ISSN[1] 
+      
+      cleanRows <- cleanRows |>
+        mutate(Print_ISSN = fillInPrint)
+    }
+  }
+  else{
+    cleanRows <- cleanRows
+  }
+  
+TR_J3_Filled = rbind(TR_J3_Filled, cleanRows) 
+  
+}
+
+TR_J3_Filled
+```
+
+### Add the One Row Titles
+
+```{r}
+TR_J3_One_Row <- TR_J3_Raw |>
+  filter(!rowCode %in% dupeCheck$rowCode)
+
+TR_J3_Cleaned <- rbind(TR_J3_Filled, TR_J3_One_Row)
+```
+
+
+### Re-Create the TR_J3_Raw and Export to the Usage Database
+
+
+```{r}
+TR_J3_Export <- TR_J3_Cleaned |>
+  group_by(Title, Access_Type, Online_ISSN, Print_ISSN, Vendor, Metric_Type) |>
+  summarise(`Jul-2021` = sum(ifelse(is.na(`Jul-2021`) == TRUE, 0, `Jul-2021`)),
+            `Aug-2021` = sum(ifelse(is.na(`Aug-2021`) == TRUE, 0, `Aug-2021`)),
+            `Sep-2021` = sum(ifelse(is.na(`Sep-2021`) == TRUE, 0, `Sep-2021`)),
+            `Oct-2021` = sum(ifelse(is.na(`Oct-2021`) == TRUE, 0, `Oct-2021`)),
+            `Nov-2021` = sum(ifelse(is.na(`Nov-2021`) == TRUE, 0, `Nov-2021`)),
+            `Dec-2021` = sum(ifelse(is.na(`Dec-2021`) == TRUE, 0, `Dec-2021`)),
+            `Jan-2022` = sum(ifelse(is.na(`Jan-2022`) == TRUE, 0, `Jan-2022`)),
+            `Feb-2022` = sum(ifelse(is.na(`Feb-2022`) == TRUE, 0, `Feb-2022`)),
+            `Mar-2022` = sum(ifelse(is.na(`Mar-2022`) == TRUE, 0, `Mar-2022`)),
+            `Apr-2022` = sum(ifelse(is.na(`Apr-2022`) == TRUE, 0, `Apr-2022`)),
+            `May-2022` = sum(ifelse(is.na(`May-2022`) == TRUE, 0, `May-2022`)),
+            `Jun-2022` = sum(ifelse(is.na(`Jun-2022`) == TRUE, 0, `Jun-2022`)),
+            `Jul-2022` = sum(ifelse(is.na(`Jul-2022`) == TRUE, 0, `Jul-2022`)),
+            `Aug-2022` = sum(ifelse(is.na(`Aug-2022`) == TRUE, 0, `Aug-2022`)),
+            `Sep-2022` = sum(ifelse(is.na(`Sep-2022`) == TRUE, 0, `Sep-2022`)),
+            `Oct-2022` = sum(ifelse(is.na(`Oct-2022`) == TRUE, 0, `Oct-2022`)),
+            `Nov-2022` = sum(ifelse(is.na(`Nov-2022`) == TRUE, 0, `Nov-2022`)),
+            `Dec-2022` = sum(ifelse(is.na(`Dec-2022`) == TRUE, 0, `Dec-2022`)),
+            `Jan-2023` = sum(ifelse(is.na(`Jan-2023`) == TRUE, 0, `Jan-2023`)),
+            `Feb-2023` = sum(ifelse(is.na(`Feb-2023`) == TRUE, 0, `Feb-2023`)),
+            `Mar-2023` = sum(ifelse(is.na(`Mar-2023`) == TRUE, 0, `Mar-2023`)),
+            `Apr-2023` = sum(ifelse(is.na(`Apr-2023`) == TRUE, 0, `Apr-2023`)),
+            `May-2023` = sum(ifelse(is.na(`May-2023`) == TRUE, 0, `May-2023`)),
+            `Jun-2023` = sum(ifelse(is.na(`Jun-2023`) == TRUE, 0, `Jun-2023`)),
+            `Jul-2023` = sum(ifelse(is.na(`Jul-2023`) == TRUE, 0, `Jul-2023`)),
+            `Aug-2023` = sum(ifelse(is.na(`Aug-2023`) == TRUE, 0, `Aug-2023`)),
+            `Sep-2023` = sum(ifelse(is.na(`Sep-2023`) == TRUE, 0, `Sep-2023`)),
+            `Oct-2023` = sum(ifelse(is.na(`Oct-2023`) == TRUE, 0, `Oct-2023`)),
+            `Nov-2023` = sum(ifelse(is.na(`Nov-2023`) == TRUE, 0, `Nov-2023`)),
+            `Dec-2023` = sum(ifelse(is.na(`Dec-2023`) == TRUE, 0, `Dec-2023`)),
+            `Jan-2024` = sum(ifelse(is.na(`Jan-2024`) == TRUE, 0, `Jan-2024`)),
+            `Feb-2024` = sum(ifelse(is.na(`Feb-2024`) == TRUE, 0, `Feb-2024`)),
+            `Mar-2024` = sum(ifelse(is.na(`Mar-2024`) == TRUE, 0, `Mar-2024`)),
+            `Apr-2024` = sum(ifelse(is.na(`Apr-2024`) == TRUE, 0, `Apr-2024`)),
+            `May-2024` = sum(ifelse(is.na(`May-2024`) == TRUE, 0, `May-2024`)),
+            `Jun-2024` = sum(ifelse(is.na(`Jun-2024`) == TRUE, 0, `Jun-2024`)),
+            `Jul-2024` = sum(ifelse(is.na(`Jul-2024`) == TRUE, 0, `Jul-2024`)),
+            `Aug-2024` = sum(ifelse(is.na(`Aug-2024`) == TRUE, 0, `Aug-2024`)),
+            `Sep-2024` = sum(ifelse(is.na(`Sep-2024`) == TRUE, 0, `Sep-2024`)),
+            `Oct-2024` = sum(ifelse(is.na(`Oct-2024`) == TRUE, 0, `Oct-2024`)),
+            `Nov-2024` = sum(ifelse(is.na(`Nov-2024`) == TRUE, 0, `Nov-2024`)),
+            `Dec-2024` = sum(ifelse(is.na(`Dec-2024`) == TRUE, 0, `Dec-2024`)),
+            `Jan-2025` = sum(ifelse(is.na(`Jan-2025`) == TRUE, 0, `Jan-2025`)),
+            `Feb-2025` = sum(ifelse(is.na(`Feb-2025`) == TRUE, 0, `Feb-2025`)),
+            `Mar-2025` = sum(ifelse(is.na(`Mar-2025`) == TRUE, 0, `Mar-2025`)),
+            `Apr-2025` = sum(ifelse(is.na(`Apr-2025`) == TRUE, 0, `Apr-2025`)),
+            `May-2025` = sum(ifelse(is.na(`May-2025`) == TRUE, 0, `May-2025`)),
+            `Jun-2025` = sum(ifelse(is.na(`Jun-2025`) == TRUE, 0, `Jun-2025`)),
+            `Jul-2025` = sum(ifelse(is.na(`Jul-2025`) == TRUE, 0, `Jul-2025`)),
+            `Aug-2025` = sum(ifelse(is.na(`Aug-2025`) == TRUE, 0, `Aug-2025`)),
+            `Sep-2025` = sum(ifelse(is.na(`Sep-2025`) == TRUE, 0, `Sep-2025`)),
+            `Oct-2025` = sum(ifelse(is.na(`Oct-2025`) == TRUE, 0, `Oct-2025`)),
+            `Nov-2025` = sum(ifelse(is.na(`Nov-2025`) == TRUE, 0, `Nov-2025`)),
+            `Dec-2025` = sum(ifelse(is.na(`Dec-2025`) == TRUE, 0, `Dec-2025`)),
+            `Jan-2026` = sum(ifelse(is.na(`Jan-2026`) == TRUE, 0, `Jan-2026`)),
+            `Feb-2026` = sum(ifelse(is.na(`Feb-2026`) == TRUE, 0, `Feb-2026`)),
+            `Mar-2026` = sum(ifelse(is.na(`Mar-2026`) == TRUE, 0, `Mar-2026`)),
+            `Apr-2026` = sum(ifelse(is.na(`Apr-2026`) == TRUE, 0, `Apr-2026`)),
+            `May-2026` = sum(ifelse(is.na(`May-2026`) == TRUE, 0, `May-2026`)),
+            `Jun-2026` = sum(ifelse(is.na(`Jun-2026`) == TRUE, 0, `Jun-2026`))) |>
+  mutate(Reporting_Period_Total = `Jul-2021` + `Aug-2021` + `Sep-2021` + `Oct-2021` + `Nov-2021` + `Dec-2021` + `Jan-2022` + `Feb-2022` + `Mar-2022` + `Apr-2022` + `May-2022` + `Jun-2022` + 
+                                  `Jul-2022` + `Aug-2022` + `Sep-2022` + `Oct-2022` + `Nov-2022` + `Dec-2022` + `Jan-2023` + `Feb-2023` + `Mar-2023` + `Apr-2023` + `May-2023` + `Jun-2023` +
+                                  `Jul-2023` + `Aug-2023` + `Sep-2023` + `Oct-2023` + `Nov-2023` + `Dec-2023` + `Jan-2024` + `Feb-2024` + `Mar-2024` + `Apr-2024` + `May-2024` + `Jun-2024` +
+                                  `Jul-2024` + `Aug-2024` + `Sep-2024` + `Oct-2024` + `Nov-2024` + `Dec-2024` + `Jan-2025` + `Feb-2025` + `Mar-2025` + `Apr-2025` + `May-2025` + `Jun-2025` +
+                                  `Jul-2025` + `Aug-2025` + `Sep-2025` + `Oct-2025` + `Nov-2025` + `Dec-2025` + `Jan-2026` + `Feb-2026` + `Mar-2026` + `Apr-2026` + `May-2026` + `Jun-2026`)
+
+TR_J3_Export
+```
+
+
+```{r}
+sum(TR_J3_Export$Reporting_Period_Total)
+sum(TR_J3_Raw$Reporting_Period_Total)
+```
+
+
+```{r}
+dbWriteTable(con, 'TR_J3_Raw', TR_J3_Export, overwrite = TRUE, row.names = FALSE)
+```
+
+
+
+
+
+# Combine No-ISBN and ISBN Rows for the Same Title
+
+Some titles have two rows for each title/metric type combination: one with an ISBN and one with ISBN "Unknown". This cell fills in the Unknown ISBNs and de-duplicates the rows.
+
+
+## TR_B3
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+TR_B3_Raw <- dbGetQuery(con,
+                    "SELECT *
+                    FROM TR_B3_Raw") |>
+  mutate(rowCode = paste(Title, Access_Type, Vendor, Metric_Type),
+         ISBN = ifelse(is.na(ISBN) == TRUE, 'Unknown', ISBN))
+
+
+```
+
+
+
+### Find the Number of Rows per Title by Online_ISSN type
+
+Each title eligible should have two titles per metric type, one with an Online_ISSN and one without.
+
+
+```{r}
+dupeCheck <- TR_B3_Raw |>
+  filter(Title != 'Unknown') |>
+  group_by(rowCode) |>
+  summarise(rowCount = n(),
+            unknownISBN = sum(ifelse(ISBN == 'Unknown', 1, 0))) |>
+  filter(rowCount > 1) |>
+  ungroup() |>
+  arrange(desc(rowCount))
+
+dupeCheck
+```
+
+
+```{r}
+sum(is.na(TR_B3_Raw$ISBN))
+```
+
+
+### Fill in the Gaps
+
+
+```{r}
+TR_B3_Candidates <- TR_B3_Raw |>
+  filter(rowCode %in% dupeCheck$rowCode)
+
+uniqueRowCodes <- unique(TR_B3_Candidates$rowCode)
+
+TR_B3_Filled <- data.frame()
+
+for(i in 1:length(uniqueRowCodes)){
+  if(i %% 1000 == 0){
+    print(i)
+  }
+  
+  candidateRows <- TR_B3_Candidates |>
+    filter(rowCode == uniqueRowCodes[i])
+  
+  # ISBN
+  if(any(candidateRows$ISBN != 'Unknown')){
+    correctISBN <- candidateRows |>
+      filter(ISBN != 'Unknown')
+    
+    if(length(unique(correctISBN$ISBN)) > 1){
+      cleanRows <- candidateRows
+    }
+    else{
+      fillInISBN <- correctISBN$ISBN[1] 
+      
+      cleanRows <- candidateRows |>
+        mutate(ISBN = fillInISBN)
+    }
+  }
+  else{
+    cleanRows <- candidateRows
+  }
+
+  
+TR_B3_Filled = rbind(TR_B3_Filled, cleanRows) 
+  
+}
+
+TR_B3_Filled
+```
+
+
+### Add the One Row Titles
+
+```{r}
+TR_B3_One_Row <- TR_B3_Raw |>
+  filter(!rowCode %in% dupeCheck$rowCode)
+
+TR_B3_Cleaned <- rbind(TR_B3_Filled, TR_B3_One_Row)
+```
+
+
+### Re-Create the TR_B3_Raw and Export to the Usage Database
+
+
+```{r}
+TR_B3_Export <- TR_B3_Cleaned |>
+  group_by(Title, Access_Type, ISBN, Vendor, Metric_Type) |>
+  summarise(`Jul-2021` = sum(ifelse(is.na(`Jul-2021`) == TRUE, 0, `Jul-2021`)),
+            `Aug-2021` = sum(ifelse(is.na(`Aug-2021`) == TRUE, 0, `Aug-2021`)),
+            `Sep-2021` = sum(ifelse(is.na(`Sep-2021`) == TRUE, 0, `Sep-2021`)),
+            `Oct-2021` = sum(ifelse(is.na(`Oct-2021`) == TRUE, 0, `Oct-2021`)),
+            `Nov-2021` = sum(ifelse(is.na(`Nov-2021`) == TRUE, 0, `Nov-2021`)),
+            `Dec-2021` = sum(ifelse(is.na(`Dec-2021`) == TRUE, 0, `Dec-2021`)),
+            `Jan-2022` = sum(ifelse(is.na(`Jan-2022`) == TRUE, 0, `Jan-2022`)),
+            `Feb-2022` = sum(ifelse(is.na(`Feb-2022`) == TRUE, 0, `Feb-2022`)),
+            `Mar-2022` = sum(ifelse(is.na(`Mar-2022`) == TRUE, 0, `Mar-2022`)),
+            `Apr-2022` = sum(ifelse(is.na(`Apr-2022`) == TRUE, 0, `Apr-2022`)),
+            `May-2022` = sum(ifelse(is.na(`May-2022`) == TRUE, 0, `May-2022`)),
+            `Jun-2022` = sum(ifelse(is.na(`Jun-2022`) == TRUE, 0, `Jun-2022`)),
+            `Jul-2022` = sum(ifelse(is.na(`Jul-2022`) == TRUE, 0, `Jul-2022`)),
+            `Aug-2022` = sum(ifelse(is.na(`Aug-2022`) == TRUE, 0, `Aug-2022`)),
+            `Sep-2022` = sum(ifelse(is.na(`Sep-2022`) == TRUE, 0, `Sep-2022`)),
+            `Oct-2022` = sum(ifelse(is.na(`Oct-2022`) == TRUE, 0, `Oct-2022`)),
+            `Nov-2022` = sum(ifelse(is.na(`Nov-2022`) == TRUE, 0, `Nov-2022`)),
+            `Dec-2022` = sum(ifelse(is.na(`Dec-2022`) == TRUE, 0, `Dec-2022`)),
+            `Jan-2023` = sum(ifelse(is.na(`Jan-2023`) == TRUE, 0, `Jan-2023`)),
+            `Feb-2023` = sum(ifelse(is.na(`Feb-2023`) == TRUE, 0, `Feb-2023`)),
+            `Mar-2023` = sum(ifelse(is.na(`Mar-2023`) == TRUE, 0, `Mar-2023`)),
+            `Apr-2023` = sum(ifelse(is.na(`Apr-2023`) == TRUE, 0, `Apr-2023`)),
+            `May-2023` = sum(ifelse(is.na(`May-2023`) == TRUE, 0, `May-2023`)),
+            `Jun-2023` = sum(ifelse(is.na(`Jun-2023`) == TRUE, 0, `Jun-2023`)),
+            `Jul-2023` = sum(ifelse(is.na(`Jul-2023`) == TRUE, 0, `Jul-2023`)),
+            `Aug-2023` = sum(ifelse(is.na(`Aug-2023`) == TRUE, 0, `Aug-2023`)),
+            `Sep-2023` = sum(ifelse(is.na(`Sep-2023`) == TRUE, 0, `Sep-2023`)),
+            `Oct-2023` = sum(ifelse(is.na(`Oct-2023`) == TRUE, 0, `Oct-2023`)),
+            `Nov-2023` = sum(ifelse(is.na(`Nov-2023`) == TRUE, 0, `Nov-2023`)),
+            `Dec-2023` = sum(ifelse(is.na(`Dec-2023`) == TRUE, 0, `Dec-2023`)),
+            `Jan-2024` = sum(ifelse(is.na(`Jan-2024`) == TRUE, 0, `Jan-2024`)),
+            `Feb-2024` = sum(ifelse(is.na(`Feb-2024`) == TRUE, 0, `Feb-2024`)),
+            `Mar-2024` = sum(ifelse(is.na(`Mar-2024`) == TRUE, 0, `Mar-2024`)),
+            `Apr-2024` = sum(ifelse(is.na(`Apr-2024`) == TRUE, 0, `Apr-2024`)),
+            `May-2024` = sum(ifelse(is.na(`May-2024`) == TRUE, 0, `May-2024`)),
+            `Jun-2024` = sum(ifelse(is.na(`Jun-2024`) == TRUE, 0, `Jun-2024`)),
+            `Jul-2024` = sum(ifelse(is.na(`Jul-2024`) == TRUE, 0, `Jul-2024`)),
+            `Aug-2024` = sum(ifelse(is.na(`Aug-2024`) == TRUE, 0, `Aug-2024`)),
+            `Sep-2024` = sum(ifelse(is.na(`Sep-2024`) == TRUE, 0, `Sep-2024`)),
+            `Oct-2024` = sum(ifelse(is.na(`Oct-2024`) == TRUE, 0, `Oct-2024`)),
+            `Nov-2024` = sum(ifelse(is.na(`Nov-2024`) == TRUE, 0, `Nov-2024`)),
+            `Dec-2024` = sum(ifelse(is.na(`Dec-2024`) == TRUE, 0, `Dec-2024`)),
+            `Jan-2025` = sum(ifelse(is.na(`Jan-2025`) == TRUE, 0, `Jan-2025`)),
+            `Feb-2025` = sum(ifelse(is.na(`Feb-2025`) == TRUE, 0, `Feb-2025`)),
+            `Mar-2025` = sum(ifelse(is.na(`Mar-2025`) == TRUE, 0, `Mar-2025`)),
+            `Apr-2025` = sum(ifelse(is.na(`Apr-2025`) == TRUE, 0, `Apr-2025`)),
+            `May-2025` = sum(ifelse(is.na(`May-2025`) == TRUE, 0, `May-2025`)),
+            `Jun-2025` = sum(ifelse(is.na(`Jun-2025`) == TRUE, 0, `Jun-2025`)),
+            `Jul-2025` = sum(ifelse(is.na(`Jul-2025`) == TRUE, 0, `Jul-2025`)),
+            `Aug-2025` = sum(ifelse(is.na(`Aug-2025`) == TRUE, 0, `Aug-2025`)),
+            `Sep-2025` = sum(ifelse(is.na(`Sep-2025`) == TRUE, 0, `Sep-2025`)),
+            `Oct-2025` = sum(ifelse(is.na(`Oct-2025`) == TRUE, 0, `Oct-2025`)),
+            `Nov-2025` = sum(ifelse(is.na(`Nov-2025`) == TRUE, 0, `Nov-2025`)),
+            `Dec-2025` = sum(ifelse(is.na(`Dec-2025`) == TRUE, 0, `Dec-2025`)),
+            `Jan-2026` = sum(ifelse(is.na(`Jan-2026`) == TRUE, 0, `Jan-2026`)),
+            `Feb-2026` = sum(ifelse(is.na(`Feb-2026`) == TRUE, 0, `Feb-2026`)),
+            `Mar-2026` = sum(ifelse(is.na(`Mar-2026`) == TRUE, 0, `Mar-2026`)),
+            `Apr-2026` = sum(ifelse(is.na(`Apr-2026`) == TRUE, 0, `Apr-2026`)),
+            `May-2026` = sum(ifelse(is.na(`May-2026`) == TRUE, 0, `May-2026`)),
+            `Jun-2026` = sum(ifelse(is.na(`Jun-2026`) == TRUE, 0, `Jun-2026`))) |>
+  mutate(Reporting_Period_Total = `Jul-2021` + `Aug-2021` + `Sep-2021` + `Oct-2021` + `Nov-2021` + `Dec-2021` + `Jan-2022` + `Feb-2022` + `Mar-2022` + `Apr-2022` + `May-2022` + `Jun-2022` + 
+                                  `Jul-2022` + `Aug-2022` + `Sep-2022` + `Oct-2022` + `Nov-2022` + `Dec-2022` + `Jan-2023` + `Feb-2023` + `Mar-2023` + `Apr-2023` + `May-2023` + `Jun-2023` +
+                                  `Jul-2023` + `Aug-2023` + `Sep-2023` + `Oct-2023` + `Nov-2023` + `Dec-2023` + `Jan-2024` + `Feb-2024` + `Mar-2024` + `Apr-2024` + `May-2024` + `Jun-2024` +
+                                  `Jul-2024` + `Aug-2024` + `Sep-2024` + `Oct-2024` + `Nov-2024` + `Dec-2024` + `Jan-2025` + `Feb-2025` + `Mar-2025` + `Apr-2025` + `May-2025` + `Jun-2025` +
+                                  `Jul-2025` + `Aug-2025` + `Sep-2025` + `Oct-2025` + `Nov-2025` + `Dec-2025` + `Jan-2026` + `Feb-2026` + `Mar-2026` + `Apr-2026` + `May-2026` + `Jun-2026`)
+
+TR_B3_Export
+```
+
+
+```{r}
+sum(TR_B3_Raw$Reporting_Period_Total)
+sum(TR_B3_Export$Reporting_Period_Total)
+```
+
+
+
+```{r}
+dbWriteTable(con, 'TR_B3_Raw', TR_B3_Export, overwrite = TRUE, row.names = FALSE)
+```
+
+
+
+# TR Cleaning
+
+The TR's size will make it easier to clean in smaller chunks instead of all at once.
+
+
+
+## Combine No-ISSN and ISSN / No-ISBN and ISBN Rows for the Same Title
+
+Some titles have two rows for each title/metric type combination: one with an ISSN/ISBN and one with ISSN/ISBN "Unknown". This cell fills in the Unknown ISSNs/ISBNs and de-duplicates the rows.
+
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+TR_Raw <- dbGetQuery(con,
+                    "SELECT *
+                    FROM TR_Archive") |>
+  mutate(rowCode = paste(Title, Vendor, Metric_Type))
+
+
+```
+
+
+
+### Find the Number of Rows per Title by Online_ISSN type
+
+Each title eligible should have two titles per metric type, one with an Online_ISSN and one without.
+
+
+```{r}
+dupeCheck <- TR_Raw |>
+  filter(Title != 'Unknown') |>
+  group_by(rowCode) |>
+  summarise(rowCount = n(),
+            unknownOnlineISSN = sum(ifelse(Online_ISSN == 'Unknown', 1, 0)),
+            unknownPrintISSN = sum(ifelse(Print_ISSN == 'Unknown', 1, 0)),
+            unknownISBN = sum(ifelse(ISBN == 'Unknown', 1, 0))) |>
+  filter(rowCount > 1) |>
+  ungroup() |>
+  arrange(desc(rowCount))
+
+dupeCheck
+```
+
+
+### Fill in the Gaps
+
+
+```{r}
+TR_Candidates <- TR_Raw |>
+  filter(rowCode %in% dupeCheck$rowCode)
+
+uniqueRowCodes <- unique(TR_Candidates$rowCode)
+
+TR_Filled <- data.frame()
+
+for(i in 60001:length(uniqueRowCodes)){
+  if(i %% 1000 == 0){
+    print(i)
+  }
+  
+  candidateRows <- TR_Candidates |>
+    filter(rowCode == uniqueRowCodes[i])
+  
+  # Online_ISSN
+  if(any(candidateRows$Online_ISSN != 'Unknown')){
+    correctOnlineISSN <- candidateRows |>
+      filter(Online_ISSN != 'Unknown')
+    
+    if(length(unique(correctOnlineISSN$Online_ISSN)) > 1){
+      cleanRows <- candidateRows
+    }
+    else{
+      fillInOnline <- correctOnlineISSN$Online_ISSN[1] 
+      
+      cleanRows <- candidateRows |>
+        mutate(Online_ISSN = fillInOnline)
+    }
+  }
+  else{
+    cleanRows <- candidateRows
+  }
+  
+  # Print_ISSN
+  if(any(cleanRows$Print_ISSN != 'Unknown')){
+    correctPrintISSN <- cleanRows |>
+      filter(Print_ISSN != 'Unknown')
+    
+    if(length(unique(correctPrintISSN$Print_ISSN)) > 1){
+      cleanRows <- cleanRows
+    }
+    else{
+      fillInPrint <- correctPrintISSN$Print_ISSN[1] 
+      
+      cleanRows <- cleanRows |>
+        mutate(Print_ISSN = fillInPrint)
+    }
+  }
+  else{
+    cleanRows <- cleanRows
+  }
+  
+  # ISBN
+  if(any(cleanRows$ISBN != 'Unknown')){
+    correctISBN <- cleanRows |>
+      filter(ISBN != 'Unknown')
+    
+    if(length(unique(correctISBN$ISBN)) > 1){
+      cleanRows <- cleanRows
+    }
+    else{
+      fillInISBN <- correctISBN$ISBN[1] 
+      
+      cleanRows <- cleanRows |>
+        mutate(ISBN = fillInISBN)
+    }
+  }
+  else{
+    cleanRows <- cleanRows
+  }
+  
+TR_Filled = rbind(TR_Filled, cleanRows) 
+  
+}
+
+TR_Filled
+```
+
+
+### Save Spot for Exporting
+
+
+```{r}
+write_xlsx(TR_Filled, 'TR Filled for IDs 60001-End.xlsx')
+```
+
+
+
+### Load and Combine All Saved TR Files
+
+
+```{r}
+TR1 <- read_excel('TR Filled for IDs 1-10000.xlsx')
+TR2 <- read_excel('TR Filled for IDs 10001-20000.xlsx')
+TR3 <- read_excel('TR Filled for IDs 20001-30000.xlsx')
+TR4 <- read_excel('TR Filled for IDs 30001-40000.xlsx')
+TR5 <- read_excel('TR Filled for IDs 40001-60000.xlsx')
+TR6 <- read_excel('TR Filled for IDs 60001-End.xlsx')
+
+TR_Filled <- rbind(TR1, TR2, TR3, TR4, TR5, TR6) |>
+  distinct()
+```
+
+
+### Add the One Row Titles
+
+```{r}
+TR_One_Row <- TR_Raw |>
+  filter(!rowCode %in% dupeCheck$rowCode)
+
+TR_Cleaned <- rbind(TR_Filled, TR_One_Row)
+```
+
+
+
+
+
+
+
+### Re-Create the TR_J3_Raw and Export to the Usage Database
+
+
+```{r}
+TR_Export <- TR_Cleaned |>
+  group_by(Title, Online_ISSN, Print_ISSN, ISBN, Vendor, Metric_Type) |>
+  summarise(`Jan-2021` = sum(ifelse(is.na(`Jan-2021`) == TRUE, 0, `Jan-2021`)),
+            `Feb-2021` = sum(ifelse(is.na(`Feb-2021`) == TRUE, 0, `Feb-2021`)),
+            `Mar-2021` = sum(ifelse(is.na(`Mar-2021`) == TRUE, 0, `Mar-2021`)),
+            `Apr-2021` = sum(ifelse(is.na(`Apr-2021`) == TRUE, 0, `Apr-2021`)),
+            `May-2021` = sum(ifelse(is.na(`May-2021`) == TRUE, 0, `May-2021`)),
+            `Jun-2021` = sum(ifelse(is.na(`Jun-2021`) == TRUE, 0, `Jun-2021`)),
+            `Jul-2021` = sum(ifelse(is.na(`Jul-2021`) == TRUE, 0, `Jul-2021`)),
+            `Aug-2021` = sum(ifelse(is.na(`Aug-2021`) == TRUE, 0, `Aug-2021`)),
+            `Sep-2021` = sum(ifelse(is.na(`Sep-2021`) == TRUE, 0, `Sep-2021`)),
+            `Oct-2021` = sum(ifelse(is.na(`Oct-2021`) == TRUE, 0, `Oct-2021`)),
+            `Nov-2021` = sum(ifelse(is.na(`Nov-2021`) == TRUE, 0, `Nov-2021`)),
+            `Dec-2021` = sum(ifelse(is.na(`Dec-2021`) == TRUE, 0, `Dec-2021`)),
+            `Jan-2022` = sum(ifelse(is.na(`Jan-2022`) == TRUE, 0, `Jan-2022`)),
+            `Feb-2022` = sum(ifelse(is.na(`Feb-2022`) == TRUE, 0, `Feb-2022`)),
+            `Mar-2022` = sum(ifelse(is.na(`Mar-2022`) == TRUE, 0, `Mar-2022`)),
+            `Apr-2022` = sum(ifelse(is.na(`Apr-2022`) == TRUE, 0, `Apr-2022`)),
+            `May-2022` = sum(ifelse(is.na(`May-2022`) == TRUE, 0, `May-2022`)),
+            `Jun-2022` = sum(ifelse(is.na(`Jun-2022`) == TRUE, 0, `Jun-2022`)),
+            `Jul-2022` = sum(ifelse(is.na(`Jul-2022`) == TRUE, 0, `Jul-2022`)),
+            `Aug-2022` = sum(ifelse(is.na(`Aug-2022`) == TRUE, 0, `Aug-2022`)),
+            `Sep-2022` = sum(ifelse(is.na(`Sep-2022`) == TRUE, 0, `Sep-2022`)),
+            `Oct-2022` = sum(ifelse(is.na(`Oct-2022`) == TRUE, 0, `Oct-2022`)),
+            `Nov-2022` = sum(ifelse(is.na(`Nov-2022`) == TRUE, 0, `Nov-2022`)),
+            `Dec-2022` = sum(ifelse(is.na(`Dec-2022`) == TRUE, 0, `Dec-2022`)),
+            `Jan-2023` = sum(ifelse(is.na(`Jan-2023`) == TRUE, 0, `Jan-2023`)),
+            `Feb-2023` = sum(ifelse(is.na(`Feb-2023`) == TRUE, 0, `Feb-2023`)),
+            `Mar-2023` = sum(ifelse(is.na(`Mar-2023`) == TRUE, 0, `Mar-2023`)),
+            `Apr-2023` = sum(ifelse(is.na(`Apr-2023`) == TRUE, 0, `Apr-2023`)),
+            `May-2023` = sum(ifelse(is.na(`May-2023`) == TRUE, 0, `May-2023`)),
+            `Jun-2023` = sum(ifelse(is.na(`Jun-2023`) == TRUE, 0, `Jun-2023`)),
+            `Jul-2023` = sum(ifelse(is.na(`Jul-2023`) == TRUE, 0, `Jul-2023`)),
+            `Aug-2023` = sum(ifelse(is.na(`Aug-2023`) == TRUE, 0, `Aug-2023`)),
+            `Sep-2023` = sum(ifelse(is.na(`Sep-2023`) == TRUE, 0, `Sep-2023`)),
+            `Oct-2023` = sum(ifelse(is.na(`Oct-2023`) == TRUE, 0, `Oct-2023`)),
+            `Nov-2023` = sum(ifelse(is.na(`Nov-2023`) == TRUE, 0, `Nov-2023`)),
+            `Dec-2023` = sum(ifelse(is.na(`Dec-2023`) == TRUE, 0, `Dec-2023`)),
+            `Jan-2024` = sum(ifelse(is.na(`Jan-2024`) == TRUE, 0, `Jan-2024`)),
+            `Feb-2024` = sum(ifelse(is.na(`Feb-2024`) == TRUE, 0, `Feb-2024`)),
+            `Mar-2024` = sum(ifelse(is.na(`Mar-2024`) == TRUE, 0, `Mar-2024`)),
+            `Apr-2024` = sum(ifelse(is.na(`Apr-2024`) == TRUE, 0, `Apr-2024`)),
+            `May-2024` = sum(ifelse(is.na(`May-2024`) == TRUE, 0, `May-2024`)),
+            `Jun-2024` = sum(ifelse(is.na(`Jun-2024`) == TRUE, 0, `Jun-2024`)),
+            `Jul-2024` = sum(ifelse(is.na(`Jul-2024`) == TRUE, 0, `Jul-2024`)),
+            `Aug-2024` = sum(ifelse(is.na(`Aug-2024`) == TRUE, 0, `Aug-2024`)),
+            `Sep-2024` = sum(ifelse(is.na(`Sep-2024`) == TRUE, 0, `Sep-2024`)),
+            `Oct-2024` = sum(ifelse(is.na(`Oct-2024`) == TRUE, 0, `Oct-2024`)),
+            `Nov-2024` = sum(ifelse(is.na(`Nov-2024`) == TRUE, 0, `Nov-2024`)),
+            `Dec-2024` = sum(ifelse(is.na(`Dec-2024`) == TRUE, 0, `Dec-2024`)),
+            `Jan-2025` = sum(ifelse(is.na(`Jan-2025`) == TRUE, 0, `Jan-2025`)),
+            `Feb-2025` = sum(ifelse(is.na(`Feb-2025`) == TRUE, 0, `Feb-2025`)),
+            `Mar-2025` = sum(ifelse(is.na(`Mar-2025`) == TRUE, 0, `Mar-2025`)),
+            `Apr-2025` = sum(ifelse(is.na(`Apr-2025`) == TRUE, 0, `Apr-2025`)),
+            `May-2025` = sum(ifelse(is.na(`May-2025`) == TRUE, 0, `May-2025`)),
+            `Jun-2025` = sum(ifelse(is.na(`Jun-2025`) == TRUE, 0, `Jun-2025`)),
+            `Jul-2025` = sum(ifelse(is.na(`Jul-2025`) == TRUE, 0, `Jul-2025`)),
+            `Aug-2025` = sum(ifelse(is.na(`Aug-2025`) == TRUE, 0, `Aug-2025`)),
+            `Sep-2025` = sum(ifelse(is.na(`Sep-2025`) == TRUE, 0, `Sep-2025`)),
+            `Oct-2025` = sum(ifelse(is.na(`Oct-2025`) == TRUE, 0, `Oct-2025`)),
+            `Nov-2025` = sum(ifelse(is.na(`Nov-2025`) == TRUE, 0, `Nov-2025`)),
+            `Dec-2025` = sum(ifelse(is.na(`Dec-2025`) == TRUE, 0, `Dec-2025`)),
+            `Jan-2026` = sum(ifelse(is.na(`Jan-2026`) == TRUE, 0, `Jan-2026`)),
+            `Feb-2026` = sum(ifelse(is.na(`Feb-2026`) == TRUE, 0, `Feb-2026`)),
+            `Mar-2026` = sum(ifelse(is.na(`Mar-2026`) == TRUE, 0, `Mar-2026`)),
+            `Apr-2026` = sum(ifelse(is.na(`Apr-2026`) == TRUE, 0, `Apr-2026`)),
+            `May-2026` = sum(ifelse(is.na(`May-2026`) == TRUE, 0, `May-2026`)),
+            `Jun-2026` = sum(ifelse(is.na(`Jun-2026`) == TRUE, 0, `Jun-2026`))) |>
+  mutate(Reporting_Period_Total = `Jan-2021` + `Feb-2021` + `Mar-2021` + `Apr-2021` + `May-2021` + `Jun-2021` +
+                                  `Jul-2021` + `Aug-2021` + `Sep-2021` + `Oct-2021` + `Nov-2021` + `Dec-2021` + `Jan-2022` + `Feb-2022` + `Mar-2022` + `Apr-2022` + `May-2022` + `Jun-2022` + 
+                                  `Jul-2022` + `Aug-2022` + `Sep-2022` + `Oct-2022` + `Nov-2022` + `Dec-2022` + `Jan-2023` + `Feb-2023` + `Mar-2023` + `Apr-2023` + `May-2023` + `Jun-2023` +
+                                  `Jul-2023` + `Aug-2023` + `Sep-2023` + `Oct-2023` + `Nov-2023` + `Dec-2023` + `Jan-2024` + `Feb-2024` + `Mar-2024` + `Apr-2024` + `May-2024` + `Jun-2024` +
+                                  `Jul-2024` + `Aug-2024` + `Sep-2024` + `Oct-2024` + `Nov-2024` + `Dec-2024` + `Jan-2025` + `Feb-2025` + `Mar-2025` + `Apr-2025` + `May-2025` + `Jun-2025` +
+                                  `Jul-2025` + `Aug-2025` + `Sep-2025` + `Oct-2025` + `Nov-2025` + `Dec-2025` + `Jan-2026` + `Feb-2026` + `Mar-2026` + `Apr-2026` + `May-2026` + `Jun-2026`)
+
+TR_Export
+```
+
+
+```{r}
+sum(TR_Export$Reporting_Period_Total)
+sum(TR_Raw$Reporting_Period_Total)
+```
+
+
+```{r}
+dbWriteTable(con, 'TR_Raw', TR_Export, overwrite = TRUE, row.names = FALSE)
+```
+
