@@ -15,7 +15,7 @@ This file finds the LC codes for as many titles with e-usage as possible.
 
 
 ```{r, warning = FALSE}
-reticulate::py_config()
+reticulate::py_require(packages = c('difflib', 'fuzzywuzzy', 'python-Levenshtein'))
 library(readxl)
 library(RSQLite)
 library(DBI)
@@ -36,9 +36,9 @@ The data in these two Excel files can be found in the Alma Analytics files of th
 ```{r, warning = FALSE}
 setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\One-Off Usage Analysis\\Adding LC Codes to Usage') #Set this to the data's location on your local computer!
 
-almaData1 <- read_excel('Alma Electronic Collection ISSNs and ISBNs for Usage Joining Part 1 Aug 2026.xlsx') 
+almaData1 <- read_excel('Alma Electronic Collection ISSNs and ISBNs for Usage Joining Part 1 Nov 2026.xlsx') 
 
-almaData2 <- read_excel('Alma Electronic Collection ISSNs and ISBNs for Usage Joining Part 2 Aug 2026.xlsx')
+almaData2 <- read_excel('Alma Electronic Collection ISSNs and ISBNs for Usage Joining Part 2 Nov 2026.xlsx')
 
 almaData <- rbind(almaData1, almaData2) |>
   distinct()
