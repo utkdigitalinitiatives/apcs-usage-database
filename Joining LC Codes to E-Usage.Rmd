@@ -15,7 +15,8 @@ This file finds the LC codes for as many titles with e-usage as possible.
 
 
 ```{r, warning = FALSE}
-reticulate::py_require(packages = c('difflib', 'fuzzywuzzy', 'python-Levenshtein'))
+reticulate::py_require(packages = c('Levenshtein'), exclude_newer = '2026-06-01')
+reticulate::py_config()
 library(readxl)
 library(RSQLite)
 library(DBI)
@@ -24,6 +25,14 @@ library(tidyverse)
 library(stringr)
 library(writexl)
 library(fuzzywuzzyR)
+```
+
+
+```{python}
+import Levenshtein
+import numpy
+import difflib
+import rapidfuzz
 ```
 
 
@@ -477,12 +486,14 @@ joinedDoubleIndex
 
 This may take many minutes (even upwards of multiple hours depending on length) to finish. R will continue to run even if the computer is in sleep mode, but you will not be able to run any other R code (and this may also take up significant RAM).
 
+Note that each step in the process will count as progress, so even if the code breaks or is interrupted, any cleaned up indices will not need to be re-ran.
+
 ```{r}
  for(i in 1:length(unique(joinedDoubleIndex$index))){
 
-   if(joinedDoubleIndex$index[i] == 72411){ #This is a known error that can be skipped - the exact number might change with each semester, so keep this in mind
-     next
-   }
+   #if(joinedDoubleIndex$index[i] == 72411){ #This is a known error that can be skipped - the exact number might change with each semester, so keep this in mind
+  #   next
+  # }
    
    
    if(i %% 2500 == 0){
@@ -494,7 +505,9 @@ This may take many minutes (even upwards of multiple hours depending on length) 
 
    titleName <- options$Title.x[1]
 
-   matchTest <- GetCloseMatches(string = titleName, sequence_strings = options$Title.y, n = 1L, cutoff = 0.01)
+   matchTest <- GetCloseMatches(string = titleName, sequence_strings = options$Title.y, n = 1L, cutoff = 0.01)       
+   
+
 
    removeLines <- options |>
      filter(Title.y != matchTest)
@@ -508,6 +521,8 @@ Once this code block is run, stop! Run the joinedDoubleIndex block again. That w
 
 
 ```{r}
+#GetCloseMatches(joined$Title.x[1], joined$Title.y, n = 1L, cutoff = 0.1)
+
 joinedDoubleIndex <- joined |>
   group_by(index) |>
   summarise(n = n()) |>
@@ -560,7 +575,7 @@ Make sure this is only run once the above cell returns a 0-row data table.
 ```{r, warning = FALSE}
 setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\One-Off Usage Analysis\\Adding LC Codes to Usage')
 
-write_xlsx(joined, 'De-Duplicated Joined Titles With Fiscal Year Usage Aug 2026.xlsx')
+write_xlsx(joined, 'De-Duplicated Joined Titles With Fiscal Year Usage Nov 2026.xlsx')
 ```
 
 

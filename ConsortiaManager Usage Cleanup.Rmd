@@ -1,0 +1,215 @@
+---
+title: "ConsortiaManager Usage Cleanup"
+author: "Alexander Harriman"
+date: "2026-11-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r, warning = FALSE}
+library(dplyr)
+library(tidyverse)
+library(readxl)
+library(writexl)
+```
+
+This file is used to clean up large TR master reports with YOP, Access_Method, and Access_Type to focus on only transformative agreement journals and to make sure all files fit under the TA usage upload restrictions (less than 20MB file size, fewer than 70,000 rows).
+
+
+# Springer 
+
+Our Springer agreement only applies to select journals, so this will clean up lots of unneeded rows.
+
+
+
+## Load Raw Springer Usage and Title List
+
+```{r, warning = FALSE}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Usage Database Update\\Agreement Manager Usage Holding Area') #Set this to the data's location on your local computer!
+
+springerUse <- read_excel('Springer TR with YOP Raw Jan-Oct 2026.xlsx', skip = 14)
+springerTitle <- read_excel('Springer TA Title List.xlsx', skip = 1)
+```
+
+
+
+## Limit Use to Only Title List Titles
+
+```{r}
+springerTAUse <- springerUse |>
+  filter(Online_ISSN %in% springerTitle$`Online identifier`) |>
+  filter(Metric_Type %in% c('Unique_Item_Requests', 'Unique_Title_Requests'))
+```
+
+
+## Clean up the Publisher
+
+Only certain publishers are accepted for each vendor. This will automatically change every publisher to one that TA understands. The actual publisher isn't important in the TA's functionality.
+
+```{r}
+springerTAClean <- springerTAUse |>
+  mutate(Publisher = 'SpringerOpen')
+
+colnames(springerTAClean) <- c('Title', 'Publisher', 'Publisher_ID', 'Platform', 'DOI', 'Proprietary_ID', 'ISBN', 'Print_ISSN', 'Online_ISSN', 'URI', 'Data_Type', 'YOP', 'Access_Type', 'Access_Method', 'Metric_Type', 'Reporting_Period_Total', 'Jan-2026', 'Feb-2026', 'Mar-2026', 'Apr-2026', 'May-2026', 'Jun-2026', 'Jul-2026', 'Aug-2026', 'Sep-2026', 'Oct-2026')
+
+springerTAClean
+```
+
+
+## Export Data
+
+```{r, warning = FALSE}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Usage Database Update\\Agreement Manager Usage Holding Area') #Set this to the data's location on your local computer!
+write_xlsx(springerTAClean, 'Springer TR with YOP Clean Jan-Oct 2026.xlsx')
+```
+
+
+
+
+# Taylor and Francis
+
+
+
+## Load Raw T&F Usage and Title List
+
+```{r, warning = FALSE}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Usage Database Update\\Agreement Manager Usage Holding Area') #Set this to the data's location on your local computer!
+
+tfUse <- read_excel('Taylor and Francis TR with YOP Usage.xlsx', skip = 14)
+tfTitle <- read_excel('Taylor and Francis TA Title List.xlsx', skip = 1)
+```
+
+
+
+## Limit Use to Only Title List Titles
+
+```{r}
+tfTAUse <- tfUse |>
+  filter(Online_ISSN %in% tfTitle$`Online identifier`)
+```
+
+
+## Clean up the Publisher
+
+Only certain publishers are accepted for each vendor. This will automatically change every publisher to one that TA understands. The actual publisher isn't important in the TA's functionality.
+
+```{r}
+tfTAClean <- tfTAUse |>
+  mutate(Publisher = 'Taylor & Francis') |>
+  filter(Metric_Type %in% c('Unique_Item_Requests', 'Total_Item_Requests', 'No_License'))
+
+colnames(tfTAClean) <- c('Title', 'Publisher', 'Publisher_ID', 'Platform', 'DOI', 'Proprietary_ID', 'ISBN', 'Print_ISSN', 'Online_ISSN', 'URI', 'Data_Type', 'YOP', 'Access_Type', 'Access_Method', 'Metric_Type', 'Reporting_Period_Total', 'Jan-2026', 'Feb-2026', 'Mar-2026', 'Apr-2026', 'May-2026', 'Jun-2026', 'Jul-2026', 'Aug-2026', 'Sep-2026', 'Oct-2026', 'Nov-2026', 'Dec-2026')
+
+tfTAClean
+```
+
+
+## Export Data
+
+```{r, warning = FALSE}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Usage Database Update\\Agreement Manager Usage Holding Area') #Set this to the data's location on your local computer!
+write_xlsx(tfTAClean, 'Taylor and Francis TR with YOP Clean Jan-Oct 2026.xlsx')
+```
+
+
+
+
+
+# Sage
+
+Sage's TA only works with their Gold journals.
+
+## Load Raw Sage Usage and Title List
+
+```{r, warning = FALSE}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Usage Database Update\\Agreement Manager Usage Holding Area') #Set this to the data's location on your local computer!
+
+sageUse <- read_excel('Sage TR with YOP Raw Jan-Oct 2026.xlsx', skip = 14)
+sageTitle <- read_excel('Sage Gold OA Journal List.xlsx', skip = 1)
+```
+
+
+
+## Limit Use to Only Title List Titles
+
+```{r}
+sageTAUse <- sageUse |>
+  filter(Online_ISSN %in% sageTitle$`Online identifier`)
+```
+
+
+## Clean up the Publisher
+
+Only certain publishers are accepted for each vendor. This will automatically change every publisher to one that TA understands. The actual publisher isn't important in the TA's functionality.
+
+```{r}
+sageTAClean <- sageTAUse |>
+  mutate(Publisher = 'SAGE Publications') #|>
+  #filter(Metric_Type %in% c('Unique_Item_Requests', 'Total_Item_Requests', 'No_License'))
+
+colnames(sageTAClean) <- c('Title', 'Publisher', 'Publisher_ID', 'Platform', 'DOI', 'Proprietary_ID', 'ISBN', 'Print_ISSN', 'Online_ISSN', 'URI', 'Data_Type', 'YOP', 'Access_Type', 'Access_Method', 'Metric_Type', 'Reporting_Period_Total', 'Jan-2026', 'Feb-2026', 'Mar-2026', 'Apr-2026', 'May-2026', 'Jun-2026', 'Jul-2026', 'Aug-2026', 'Sep-2026', 'Oct-2026', 'Nov-2026', 'Dec-2026')
+
+sageTAClean
+```
+
+
+## Export Data
+
+```{r, warning = FALSE}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Usage Database Update\\Agreement Manager Usage Holding Area') #Set this to the data's location on your local computer!
+write_xlsx(sageTAClean, 'Sage TR with YOP Clean Jan-Oct 2026.xlsx')
+```
+
+
+
+
+
+# Wiley
+
+
+
+## Load Raw Wiley Usage and Title List
+
+```{r, warning = FALSE}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Usage Database Update\\Agreement Manager Usage Holding Area') #Set this to the data's location on your local computer!
+
+wileyUse <- read_excel('Wiley TR with YOP Raw Jan-Oct 2026.xlsx', skip = 14)
+wileyTitle <- read_excel('Wiley Journal Title List.xlsx', skip = 1)
+```
+
+
+
+## Limit Use to Only Title List Titles
+
+```{r}
+wileyTAUse <- wileyUse |>
+  filter(Online_ISSN %in% wileyTitle$`Online identifier`)
+```
+
+
+## Clean up the Publisher
+
+Only certain publishers are accepted for each vendor. This will automatically change every publisher to one that TA understands. The actual publisher isn't important in the TA's functionality.
+
+```{r}
+wileyTAClean <- wileyTAUse |>
+  mutate(Publisher = 'Wiley') |>
+  filter(Metric_Type %in% c('Unique_Item_Requests', 'Total_Item_Requests', 'Unique_Title_Requests', 'No_License'))
+
+colnames(wileyTAClean) <- c('Title', 'Publisher', 'Publisher_ID', 'Platform', 'DOI', 'Proprietary_ID', 'ISBN', 'Print_ISSN', 'Online_ISSN', 'URI', 'Data_Type', 'YOP', 'Access_Type', 'Access_Method', 'Metric_Type', 'Reporting_Period_Total', 'Jan-2026', 'Feb-2026', 'Mar-2026', 'Apr-2026', 'May-2026', 'Jun-2026', 'Jul-2026', 'Aug-2026', 'Sep-2026', 'Oct-2026', 'Nov-2026', 'Dec-2026')
+
+wileyTAClean
+```
+
+
+## Export Data
+
+```{r, warning = FALSE}
+setwd('C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Usage Database Update\\Agreement Manager Usage Holding Area') #Set this to the data's location on your local computer!
+write_xlsx(wileyTAClean, 'Wiley TR with YOP Clean Jan-Oct 2026.xlsx')
+```
