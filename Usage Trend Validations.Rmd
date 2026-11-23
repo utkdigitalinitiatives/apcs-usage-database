@@ -1,0 +1,918 @@
+---
+title: "Usage Trend Validation"
+author: "Alexander Harriman"
+date: "2026-09-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, warning = FALSE}
+library(dplyr)
+library(tidyverse)
+library(readxl)
+library(DBI)
+library(RSQLite)
+```
+
+
+# Multimedia Item Report (IR_M1)
+
+
+## Load the Usage Database
+
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+IR_M1 <- dbGetQuery(con,
+                    'SELECT *
+                    FROM IR_M1')
+
+IR_M1
+```
+
+
+# Check Fiscal Year Usage
+
+```{r}
+irM1ByFY <- IR_M1 |>
+  filter(Metric_Type == 'Total_Item_Requests') |>
+  mutate(across(where(is.numeric), ~replace_na(., 0))) |>
+  group_by(Vendor) |>
+  summarise(fy22 = sum(`Jul-2021` + `Aug-2021` + `Sep-2021` + `Oct-2021` + `Nov-2021` + `Dec-2021` + `Jan-2022` + `Feb-2022` + `Mar-2022` + `Apr-2022` + `May-2022` + `Jun-2022`),
+            fy23 = sum(`Jul-2022` + `Aug-2022` + `Sep-2022` + `Oct-2022` + `Nov-2022` + `Dec-2022` + `Jan-2023` + `Feb-2023` + `Mar-2023` + `Apr-2023` + `May-2023` + `Jun-2023`),
+            fy24 = sum(`Jul-2023` + `Aug-2023` + `Sep-2023` + `Oct-2023` + `Nov-2023` + `Dec-2023` + `Jan-2024` + `Feb-2024` + `Mar-2024` + `Apr-2024` + `May-2024` + `Jun-2024`),
+            fy25 = sum(`Jul-2024` + `Aug-2024` + `Sep-2024` + `Oct-2024` + `Nov-2024` + `Dec-2024` + `Jan-2025` + `Feb-2025` + `Mar-2025` + `Apr-2025` + `May-2025` + `Jun-2025`),
+            fy26 = sum(`Jul-2025` + `Aug-2025` + `Sep-2025` + `Oct-2025` + `Nov-2025` + `Dec-2025` + `Jan-2026` + `Feb-2026` + `Mar-2026` + `Apr-2026` + `May-2026` + `Jun-2026`))
+
+irM1ByFY
+```
+
+
+
+## Check for One-Off Usage Spikes
+
+```{r}
+irm1Long <- dbGetQuery(con,
+                    "SELECT Vendor
+                    , Month
+                    , SUM(Usage) as Usage
+                    FROM IR_M1_Long
+                    WHERE Metric_Type == 'Total_Item_Requests'
+                    GROUP BY Vendor, Month")
+
+
+maxMonths <- irm1Long |>
+  filter(Month >= '2024-01-01') |>
+  group_by(Vendor) |>
+  slice_max(order_by = Usage, n = 7)
+
+maxMonths
+```
+
+
+
+
+# Book Usage Report (TR_B3)
+
+
+## Load the Usage Database
+
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+TR_B3 <- dbGetQuery(con,
+                    'SELECT *
+                    FROM TR_B3')
+
+TR_B3
+```
+
+
+# Check Fiscal Year Usage
+
+```{r}
+trB3ByFY <- TR_B3 |>
+  filter(Metric_Type == 'Unique_Title_Requests') |>
+  mutate(across(where(is.numeric), ~replace_na(., 0))) |>
+  group_by(Vendor) |>
+  summarise(#fy22 = sum(`Jul-2021` + `Aug-2021` + `Sep-2021` + `Oct-2021` + `Nov-2021` + `Dec-2021` + `Jan-2022` + `Feb-2022` + `Mar-2022` + `Apr-2022` + `May-2022` + `Jun-2022`),
+            fy23 = sum(`Jul-2022` + `Aug-2022` + `Sep-2022` + `Oct-2022` + `Nov-2022` + `Dec-2022` + `Jan-2023` + `Feb-2023` + `Mar-2023` + `Apr-2023` + `May-2023` + `Jun-2023`),
+            fy24 = sum(`Jul-2023` + `Aug-2023` + `Sep-2023` + `Oct-2023` + `Nov-2023` + `Dec-2023` + `Jan-2024` + `Feb-2024` + `Mar-2024` + `Apr-2024` + `May-2024` + `Jun-2024`),
+            fy25 = sum(`Jul-2024` + `Aug-2024` + `Sep-2024` + `Oct-2024` + `Nov-2024` + `Dec-2024` + `Jan-2025` + `Feb-2025` + `Mar-2025` + `Apr-2025` + `May-2025` + `Jun-2025`),
+            fy26 = sum(`Jul-2025` + `Aug-2025` + `Sep-2025` + `Oct-2025` + `Nov-2025` + `Dec-2025` + `Jan-2026` + `Feb-2026` + `Mar-2026` + `Apr-2026` + `May-2026` + `Jun-2026`))
+
+trB3ByFY
+```
+
+
+
+## Check for One-Off Usage Spikes
+
+```{r}
+trb3Long <- dbGetQuery(con,
+                    "SELECT Vendor
+                    , Month
+                    , SUM(Usage) as Usage
+                    FROM TR_B3_Long
+                    WHERE Metric_Type == 'Total_Item_Requests'
+                    GROUP BY Vendor, Month")
+
+
+maxMonthsTRB3 <- trb3Long |>
+  filter(Month >= '2023-01-01') |>
+  group_by(Vendor) |>
+  slice_max(order_by = Usage, n = 7)
+
+maxMonthsTRB3
+```
+
+
+
+# Title Usage Report (TR)
+
+
+
+## Load the Usage Database
+
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+TR <- dbGetQuery(con,
+                    'SELECT *
+                    FROM TR')
+
+TR
+```
+
+
+# Check Fiscal Year Usage
+
+```{r}
+trByFY <- TR |>
+  filter(Metric_Type == 'Total_Item_Requests') |>
+  mutate(across(where(is.numeric), ~replace_na(., 0))) |>
+  group_by(Vendor) |>
+  summarise(#fy22 = sum(`Jul-2021` + `Aug-2021` + `Sep-2021` + `Oct-2021` + `Nov-2021` + `Dec-2021` + `Jan-2022` + `Feb-2022` + `Mar-2022` + `Apr-2022` + `May-2022` + `Jun-2022`),
+            #fy23 = sum(`Jul-2022` + `Aug-2022` + `Sep-2022` + `Oct-2022` + `Nov-2022` + `Dec-2022` + `Jan-2023` + `Feb-2023` + `Mar-2023` + `Apr-2023` + `May-2023` + `Jun-2023`),
+            fy24 = sum(`Jul-2023` + `Aug-2023` + `Sep-2023` + `Oct-2023` + `Nov-2023` + `Dec-2023` + `Jan-2024` + `Feb-2024` + `Mar-2024` + `Apr-2024` + `May-2024` + `Jun-2024`),
+            fy25 = sum(`Jul-2024` + `Aug-2024` + `Sep-2024` + `Oct-2024` + `Nov-2024` + `Dec-2024` + `Jan-2025` + `Feb-2025` + `Mar-2025` + `Apr-2025` + `May-2025` + `Jun-2025`),
+            fy26 = sum(`Jul-2025` + `Aug-2025` + `Sep-2025` + `Oct-2025` + `Nov-2025` + `Dec-2025` + `Jan-2026` + `Feb-2026` + `Mar-2026` + `Apr-2026` + `May-2026` + `Jun-2026`))
+
+trByFY
+```
+
+
+
+## Check for One-Off Usage Spikes
+
+```{r}
+trLong <- dbGetQuery(con,
+                    "SELECT Vendor
+                    , Month
+                    , SUM(Usage) as Usage
+                    FROM TR_Long
+                    WHERE Metric_Type == 'Unique_Item_Requests'
+                    GROUP BY Vendor, Month")
+
+
+maxMonthsTR <- trLong |>
+  filter(Month >= '2023-01-01') |>
+  group_by(Vendor) |>
+  slice_max(order_by = Usage, n = 7)
+
+maxMonthsTR
+```
+
+
+
+
+# Journal Usage Report (TR_J3)
+
+
+## Load the Usage Database
+
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+TR_J3 <- dbGetQuery(con,
+                    'SELECT *
+                    FROM TR_J3')
+
+TR_J3
+```
+
+
+# Check Fiscal Year Usage
+
+```{r}
+trJ3ByFY <- TR_J3 |>
+  filter(Metric_Type == 'Unique_Item_Requests') |>
+  mutate(across(where(is.numeric), ~replace_na(., 0))) |>
+  group_by(Vendor) |>
+  summarise(#fy22 = sum(`Jul-2021` + `Aug-2021` + `Sep-2021` + `Oct-2021` + `Nov-2021` + `Dec-2021` + `Jan-2022` + `Feb-2022` + `Mar-2022` + `Apr-2022` + `May-2022` + `Jun-2022`),
+            fy23 = sum(`Jul-2022` + `Aug-2022` + `Sep-2022` + `Oct-2022` + `Nov-2022` + `Dec-2022` + `Jan-2023` + `Feb-2023` + `Mar-2023` + `Apr-2023` + `May-2023` + `Jun-2023`),
+            fy24 = sum(`Jul-2023` + `Aug-2023` + `Sep-2023` + `Oct-2023` + `Nov-2023` + `Dec-2023` + `Jan-2024` + `Feb-2024` + `Mar-2024` + `Apr-2024` + `May-2024` + `Jun-2024`),
+            fy25 = sum(`Jul-2024` + `Aug-2024` + `Sep-2024` + `Oct-2024` + `Nov-2024` + `Dec-2024` + `Jan-2025` + `Feb-2025` + `Mar-2025` + `Apr-2025` + `May-2025` + `Jun-2025`),
+            fy26 = sum(`Jul-2025` + `Aug-2025` + `Sep-2025` + `Oct-2025` + `Nov-2025` + `Dec-2025` + `Jan-2026` + `Feb-2026` + `Mar-2026` + `Apr-2026` + `May-2026` + `Jun-2026`))
+
+trJ3ByFY
+```
+
+
+
+## Check for One-Off Usage Spikes
+
+```{r}
+trj3Long <- dbGetQuery(con,
+                    "SELECT Vendor
+                    , Month
+                    , SUM(Usage) as Usage
+                    FROM TR_J3_Long
+                    WHERE Metric_Type == 'Unique_Item_Requests'
+                    GROUP BY Vendor, Month")
+```
+
+
+
+
+
+
+# Database Usage Report (DR)
+
+
+
+## Load the Usage Database
+
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+DR <- dbGetQuery(con,
+                    'SELECT *
+                    FROM DR')
+
+DR
+```
+
+
+# Check Fiscal Year Usage
+
+```{r}
+drByFY <- DR |>
+  filter(Metric_Type == 'Unique_Item_Requests') |>
+  mutate(across(where(is.numeric), ~replace_na(., 0))) |>
+  group_by(Vendor) |>
+  summarise(#fy22 = sum(`Jul-2021` + `Aug-2021` + `Sep-2021` + `Oct-2021` + `Nov-2021` + `Dec-2021` + `Jan-2022` + `Feb-2022` + `Mar-2022` + `Apr-2022` + `May-2022` + `Jun-2022`),
+            #fy23 = sum(`Jul-2022` + `Aug-2022` + `Sep-2022` + `Oct-2022` + `Nov-2022` + `Dec-2022` + `Jan-2023` + `Feb-2023` + `Mar-2023` + `Apr-2023` + `May-2023` + `Jun-2023`),
+            fy24 = sum(`Jul-2023` + `Aug-2023` + `Sep-2023` + `Oct-2023` + `Nov-2023` + `Dec-2023` + `Jan-2024` + `Feb-2024` + `Mar-2024` + `Apr-2024` + `May-2024` + `Jun-2024`),
+            fy25 = sum(`Jul-2024` + `Aug-2024` + `Sep-2024` + `Oct-2024` + `Nov-2024` + `Dec-2024` + `Jan-2025` + `Feb-2025` + `Mar-2025` + `Apr-2025` + `May-2025` + `Jun-2025`),
+            fy26 = sum(`Jul-2025` + `Aug-2025` + `Sep-2025` + `Oct-2025` + `Nov-2025` + `Dec-2025` + `Jan-2026` + `Feb-2026` + `Mar-2026` + `Apr-2026` + `May-2026` + `Jun-2026`))
+
+drByFY
+```
+
+
+
+## Check for One-Off Usage Spikes
+
+```{r}
+drLong <- dbGetQuery(con,
+                    "SELECT Vendor
+                    , Month
+                    , SUM(Usage) as Usage
+                    FROM DR_Long
+                    WHERE Metric_Type == 'Unique_Item_Requests'
+                    GROUP BY Vendor, Month")
+
+```
+
+
+
+
+
+
+
+# Database Usage Report - ASERL (DR_D1)
+
+
+
+## Load the Usage Database
+
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+DR_D1 <- dbGetQuery(con,
+                    'SELECT *
+                    FROM DR_D1')
+
+DR_D1
+```
+
+
+# Check Fiscal Year Usage
+
+```{r}
+drd1ByFY <- DR_D1 |>
+  filter(Metric_Type == 'Searches_Regular') |>
+  mutate(across(where(is.numeric), ~replace_na(., 0))) |>
+  group_by(Vendor) |>
+  summarise(#fy22 = sum(`Jul-2021` + `Aug-2021` + `Sep-2021` + `Oct-2021` + `Nov-2021` + `Dec-2021` + `Jan-2022` + `Feb-2022` + `Mar-2022` + `Apr-2022` + `May-2022` + `Jun-2022`),
+            fy23 = sum(`Jul-2022` + `Aug-2022` + `Sep-2022` + `Oct-2022` + `Nov-2022` + `Dec-2022` + `Jan-2023` + `Feb-2023` + `Mar-2023` + `Apr-2023` + `May-2023` + `Jun-2023`),
+            fy24 = sum(`Jul-2023` + `Aug-2023` + `Sep-2023` + `Oct-2023` + `Nov-2023` + `Dec-2023` + `Jan-2024` + `Feb-2024` + `Mar-2024` + `Apr-2024` + `May-2024` + `Jun-2024`),
+            fy25 = sum(`Jul-2024` + `Aug-2024` + `Sep-2024` + `Oct-2024` + `Nov-2024` + `Dec-2024` + `Jan-2025` + `Feb-2025` + `Mar-2025` + `Apr-2025` + `May-2025` + `Jun-2025`),
+            fy26 = sum(`Jul-2025` + `Aug-2025` + `Sep-2025` + `Oct-2025` + `Nov-2025` + `Dec-2025` + `Jan-2026` + `Feb-2026` + `Mar-2026` + `Apr-2026` + `May-2026` + `Jun-2026`))
+
+drd1ByFY
+```
+
+
+
+## Check for One-Off Usage Spikes
+
+```{r}
+drd1Long <- dbGetQuery(con,
+                    "SELECT Vendor
+                    , Month
+                    , SUM(Usage) as Usage
+                    FROM DR_D1_Long
+                    WHERE Metric_Type == 'Searches_Regular'
+                    GROUP BY Vendor, Month")
+
+```
+
+
+
+
+
+
+
+# Platform Usage Report (PR)
+
+
+
+## Load the Usage Database
+
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+PR <- dbGetQuery(con,
+                    'SELECT *
+                    FROM PR')
+
+PR
+```
+
+
+# Check Fiscal Year Usage
+
+```{r}
+prByFY <- PR |>
+  filter(Metric_Type == 'Searches_Platform') |>
+  mutate(across(where(is.numeric), ~replace_na(., 0))) |>
+  group_by(Vendor) |>
+  summarise(#fy22 = sum(`Jul-2021` + `Aug-2021` + `Sep-2021` + `Oct-2021` + `Nov-2021` + `Dec-2021` + `Jan-2022` + `Feb-2022` + `Mar-2022` + `Apr-2022` + `May-2022` + `Jun-2022`),
+            #fy23 = sum(`Jul-2022` + `Aug-2022` + `Sep-2022` + `Oct-2022` + `Nov-2022` + `Dec-2022` + `Jan-2023` + `Feb-2023` + `Mar-2023` + `Apr-2023` + `May-2023` + `Jun-2023`),
+            fy24 = sum(`Jul-2023` + `Aug-2023` + `Sep-2023` + `Oct-2023` + `Nov-2023` + `Dec-2023` + `Jan-2024` + `Feb-2024` + `Mar-2024` + `Apr-2024` + `May-2024` + `Jun-2024`),
+            fy25 = sum(`Jul-2024` + `Aug-2024` + `Sep-2024` + `Oct-2024` + `Nov-2024` + `Dec-2024` + `Jan-2025` + `Feb-2025` + `Mar-2025` + `Apr-2025` + `May-2025` + `Jun-2025`),
+            fy26 = sum(`Jul-2025` + `Aug-2025` + `Sep-2025` + `Oct-2025` + `Nov-2025` + `Dec-2025` + `Jan-2026` + `Feb-2026` + `Mar-2026` + `Apr-2026` + `May-2026` + `Jun-2026`))
+
+prByFY
+```
+
+
+
+## Check for One-Off Usage Spikes
+
+```{r}
+prLong <- dbGetQuery(con,
+                    "SELECT Vendor
+                    , Month
+                    , SUM(Usage) as Usage
+                    FROM PR_Long
+                    WHERE Metric_Type == 'Searches_Platform'
+                    GROUP BY Vendor, Month")
+
+```
+
+
+
+
+
+
+# Platform Usage Report - ASERL (PR_P1)
+
+
+
+## Load the Usage Database
+
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+PR_P1 <- dbGetQuery(con,
+                    'SELECT *
+                    FROM PR_P1')
+
+PR_P1
+```
+
+
+# Check Fiscal Year Usage
+
+```{r}
+prp1ByFY <- PR_P1 |>
+  filter(Metric_Type == 'Searches_Platform') |>
+  mutate(across(where(is.numeric), ~replace_na(., 0))) |>
+  group_by(Vendor) |>
+  summarise(#fy22 = sum(`Jul-2021` + `Aug-2021` + `Sep-2021` + `Oct-2021` + `Nov-2021` + `Dec-2021` + `Jan-2022` + `Feb-2022` + `Mar-2022` + `Apr-2022` + `May-2022` + `Jun-2022`),
+            fy23 = sum(`Jul-2022` + `Aug-2022` + `Sep-2022` + `Oct-2022` + `Nov-2022` + `Dec-2022` + `Jan-2023` + `Feb-2023` + `Mar-2023` + `Apr-2023` + `May-2023` + `Jun-2023`),
+            fy24 = sum(`Jul-2023` + `Aug-2023` + `Sep-2023` + `Oct-2023` + `Nov-2023` + `Dec-2023` + `Jan-2024` + `Feb-2024` + `Mar-2024` + `Apr-2024` + `May-2024` + `Jun-2024`),
+            fy25 = sum(`Jul-2024` + `Aug-2024` + `Sep-2024` + `Oct-2024` + `Nov-2024` + `Dec-2024` + `Jan-2025` + `Feb-2025` + `Mar-2025` + `Apr-2025` + `May-2025` + `Jun-2025`),
+            fy26 = sum(`Jul-2025` + `Aug-2025` + `Sep-2025` + `Oct-2025` + `Nov-2025` + `Dec-2025` + `Jan-2026` + `Feb-2026` + `Mar-2026` + `Apr-2026` + `May-2026` + `Jun-2026`))
+
+prp1ByFY
+```
+
+
+
+## Check for One-Off Usage Spikes
+
+```{r}
+prp1Long <- dbGetQuery(con,
+                    "SELECT Vendor
+                    , Month
+                    , SUM(Usage) as Usage
+                    FROM PR_P1_Long
+                    WHERE Metric_Type == 'Searches_Platform'
+                    GROUP BY Vendor, Month")
+
+```
+
+
+
+
+
+
+
+
+# TR Cleaning for Python Usage Fixing
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+trArchive <- dbGetQuery(con,
+                    'SELECT *
+                    FROM TR_Archive')
+
+trArchive
+```
+
+
+
+```{r}
+trArchiveZeroed <- trArchive |>
+  mutate(`Jan-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Jan-2025`),
+         `Feb-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Feb-2025`),
+         `Mar-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Mar-2025`),
+         `Apr-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Apr-2025`),
+         `May-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `May-2025`),
+         `Jun-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Jun-2025`),
+         `Jul-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Jul-2025`),
+         `Aug-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Aug-2025`),
+         `Sep-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Sep-2025`),
+         `Oct-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Oct-2025`),
+         `Nov-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Nov-2025`),
+         `Dec-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Dec-2025`),
+         `Jan-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Jan-2026`),
+         `Feb-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Feb-2026`),
+         `Mar-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Mar-2026`),
+         `Apr-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Apr-2026`),
+         `May-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `May-2026`),
+         `Jun-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Jun-2026`)) |>
+  select(-c('index', 'Reporting_Period_Total'))
+
+trArchiveZeroed
+```
+
+
+```{r}
+dbWriteTable(con, 'TR_Archive', trArchiveZeroed, overwrite = TRUE, row.names = FALSE)
+```
+
+
+
+# TR_B3 Cleaning for Python Usage Fixing
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+trb3Raw <- dbGetQuery(con,
+                    'SELECT *
+                    FROM TR_B3_Raw')
+
+trb3Raw
+```
+
+
+
+```{r}
+trb3RawZeroed <- trb3Raw |>
+  mutate(`Jan-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Jan-2025`),
+         `Feb-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Feb-2025`),
+         `Mar-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Mar-2025`),
+         `Apr-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Apr-2025`),
+         `May-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `May-2025`),
+         `Jun-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Jun-2025`),
+         `Jul-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Jul-2025`),
+         `Aug-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Aug-2025`),
+         `Sep-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Sep-2025`),
+         `Oct-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Oct-2025`),
+         `Nov-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Nov-2025`),
+         `Dec-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Dec-2025`),
+         `Jan-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Jan-2026`),
+         `Feb-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Feb-2026`),
+         `Mar-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Mar-2026`),
+         `Apr-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Apr-2026`),
+         `May-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `May-2026`),
+         `Jun-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Jun-2026`)) |>
+  select(-c('Reporting_Period_Total'))
+
+trb3RawZeroed
+```
+
+
+```{r}
+dbWriteTable(con, 'TR_B3_Raw', trb3RawZeroed, overwrite = TRUE, row.names = FALSE)
+```
+
+
+
+
+
+# TR_J3 Cleaning for Python Usage Fixing
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+trj3Raw <- dbGetQuery(con,
+                    'SELECT *
+                    FROM TR_J3_Raw')
+
+trj3Raw
+```
+
+
+
+```{r}
+trj3RawZeroed <- trj3Raw |>
+  mutate(`Jul-2021` = ifelse(Vendor == 'APS', 0, `Jul-2021`),
+         `Aug-2021` = ifelse(Vendor == 'APS', 0, `Aug-2021`),
+         `Sep-2021` = ifelse(Vendor == 'APS', 0, `Sep-2021`),
+         `Oct-2021` = ifelse(Vendor == 'APS', 0, `Oct-2021`),
+         `Nov-2021` = ifelse(Vendor == 'APS', 0, `Nov-2021`),
+         `Dec-2021` = ifelse(Vendor == 'APS', 0, `Dec-2021`),
+         `Jan-2022` = ifelse(Vendor == 'APS', 0, `Jan-2022`),
+         `Feb-2022` = ifelse(Vendor == 'APS', 0, `Feb-2022`),
+         `Mar-2022` = ifelse(Vendor == 'APS', 0, `Mar-2022`),
+         `Apr-2022` = ifelse(Vendor == 'APS', 0, `Apr-2022`),
+         `May-2022` = ifelse(Vendor == 'APS', 0, `May-2022`),
+         `Jun-2022` = ifelse(Vendor == 'APS', 0, `Jun-2022`),
+         `Jul-2022` = ifelse(Vendor == 'APS', 0, `Jul-2022`),
+         `Aug-2022` = ifelse(Vendor == 'APS', 0, `Aug-2022`),
+         `Sep-2022` = ifelse(Vendor == 'APS', 0, `Sep-2022`),
+         `Oct-2022` = ifelse(Vendor == 'APS', 0, `Oct-2022`),
+         `Nov-2022` = ifelse(Vendor == 'APS', 0, `Nov-2022`),
+         `Dec-2022` = ifelse(Vendor == 'APS', 0, `Dec-2022`),
+         `Jan-2023` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Jan-2023`),
+         `Feb-2023` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Feb-2023`),
+         `Mar-2023` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Mar-2023`),
+         `Apr-2023` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Apr-2023`),
+         `May-2023` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `May-2023`),
+         `Jun-2023` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Jun-2023`),
+         `Jul-2023` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Jul-2023`),
+         `Aug-2023` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Aug-2023`),
+         `Sep-2023` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Sep-2023`),
+         `Oct-2023` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Oct-2023`),
+         `Nov-2023` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Nov-2023`),
+         `Dec-2023` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Dec-2023`),
+         `Jan-2024` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Jan-2024`),
+         `Feb-2024` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Feb-2024`),
+         `Mar-2024` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Mar-2024`),
+         `Apr-2024` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Apr-2024`),
+         `May-2024` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `May-2024`),
+         `Jun-2024` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Jun-2024`),
+         `Jul-2024` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Jul-2024`),
+         `Aug-2024` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Aug-2024`),
+         `Sep-2024` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Sep-2024`),
+         `Oct-2024` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Oct-2024`),
+         `Nov-2024` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Nov-2024`),
+         `Dec-2024` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Dec-2024`),
+         `Jan-2025` = ifelse(Vendor %in% c('RoyalSociety', 'APS', 'AMS'), 0, `Jan-2025`),
+         `Feb-2025` = ifelse(Vendor %in% c('RoyalSociety', 'APS', 'AMS'), 0, `Feb-2025`),
+         `Mar-2025` = ifelse(Vendor %in% c('RoyalSociety', 'APS', 'AMS'), 0, `Mar-2025`),
+         `Apr-2025` = ifelse(Vendor %in% c('RoyalSociety', 'APS', 'AMS'), 0, `Apr-2025`),
+         `May-2025` = ifelse(Vendor %in% c('RoyalSociety', 'APS', 'AMS'), 0, `May-2025`),
+         `Jun-2025` = ifelse(Vendor %in% c('RoyalSociety', 'APS', 'AMS'), 0, `Jun-2025`),
+         `Jul-2025` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Jul-2025`),
+         `Aug-2025` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Aug-2025`),
+         `Sep-2025` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Sep-2025`),
+         `Oct-2025` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Oct-2025`),
+         `Nov-2025` = ifelse(Vendor %in% c('RoyalSociety', 'APS'), 0, `Nov-2025`),
+         `Dec-2025` = ifelse(Vendor %in% c('APS'), 0, `Dec-2025`),
+         `Jan-2026` = ifelse(Vendor %in% c('APS', 'Emerald'), 0, `Jan-2026`),
+         `Feb-2026` = ifelse(Vendor %in% c('APS', 'Emerald'), 0, `Feb-2026`),
+         `Mar-2026` = ifelse(Vendor %in% c('APS', 'Emerald'), 0, `Mar-2026`),
+         `Apr-2026` = ifelse(Vendor %in% c('APS', 'Emerald'), 0, `Apr-2026`),
+         `May-2026` = ifelse(Vendor %in% c('APS', 'Emerald'), 0, `May-2026`),
+         `Jun-2026` = ifelse(Vendor %in% c('APS'), 0, `Jun-2026`)) |>
+  select(-c('Reporting_Period_Total'))
+
+trj3RawZeroed
+```
+
+
+```{r}
+dbWriteTable(con, 'TR_J3_Raw', trj3RawZeroed, overwrite = TRUE, row.names = FALSE)
+```
+
+
+
+
+
+
+# PR Cleaning for Python Usage Fixing
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+prArchive <- dbGetQuery(con,
+                    'SELECT *
+                    FROM PR_Archive')
+
+prArchive
+```
+
+
+
+```{r}
+prArchiveZeroed <- prArchive |>
+  mutate(`Jan-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Jan-2025`),
+         `Feb-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Feb-2025`),
+         `Mar-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Mar-2025`),
+         `Apr-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Apr-2025`),
+         `May-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `May-2025`),
+         `Jun-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Jun-2025`),
+         `Jul-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Jul-2025`),
+         `Aug-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Aug-2025`),
+         `Sep-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Sep-2025`),
+         `Oct-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Oct-2025`),
+         `Nov-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Nov-2025`),
+         `Dec-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Dec-2025`),
+         `Jan-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Jan-2026`),
+         `Feb-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Feb-2026`),
+         `Mar-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Mar-2026`),
+         `Apr-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Apr-2026`),
+         `May-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `May-2026`),
+         `Jun-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Jun-2026`)) |>
+  select(-c('index', 'Reporting_Period_Total'))
+
+prArchiveZeroed
+```
+
+
+```{r}
+dbWriteTable(con, 'PR_Archive', prArchiveZeroed, overwrite = TRUE, row.names = FALSE)
+```
+
+
+
+
+# PR_P1 Cleaning for Python Usage Fixing
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+prp1Raw <- dbGetQuery(con,
+                    'SELECT *
+                    FROM PR_P1_Raw')
+
+prp1Raw
+```
+
+
+
+```{r}
+prp1RawZeroed <- prp1Raw |>
+  mutate(`Jan-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Jan-2025`),
+         `Feb-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Feb-2025`),
+         `Mar-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Mar-2025`),
+         `Apr-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Apr-2025`),
+         `May-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `May-2025`),
+         `Jun-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Jun-2025`),
+         `Jul-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Jul-2025`),
+         `Aug-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Aug-2025`),
+         `Sep-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Sep-2025`),
+         `Oct-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Oct-2025`),
+         `Nov-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Nov-2025`),
+         `Dec-2025` = ifelse(Vendor %in% c('Liverpool'), 0, `Dec-2025`),
+         `Jan-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Jan-2026`),
+         `Feb-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Feb-2026`),
+         `Mar-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Mar-2026`),
+         `Apr-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Apr-2026`),
+         `May-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `May-2026`),
+         `Jun-2026` = ifelse(Vendor %in% c('Liverpool'), 0, `Jun-2026`)) |>
+  select(-c('index'))
+
+prp1RawZeroed
+```
+
+
+```{r}
+dbWriteTable(con, 'PR_P1_Raw', prp1RawZeroed, overwrite = TRUE, row.names = FALSE)
+```
+
+
+
+
+
+
+# DR Cleaning for Python Usage Fixing
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+drArchive <- dbGetQuery(con,
+                    'SELECT *
+                    FROM DR_Archive')
+
+drArchive
+```
+
+
+
+```{r}
+drArchiveZeroed <- drArchive |>
+  mutate(`Jan-2024` = ifelse(Vendor %in% c('SagePackages'), 0, `Jan-2024`),
+         `Feb-2024` = ifelse(Vendor %in% c('SagePackages'), 0, `Feb-2024`),
+         `Mar-2024` = ifelse(Vendor %in% c('SagePackages'), 0, `Mar-2024`),
+         `Apr-2024` = ifelse(Vendor %in% c('SagePackages'), 0, `Apr-2024`),
+         `May-2024` = ifelse(Vendor %in% c('SagePackages'), 0, `May-2024`),
+         `Jun-2024` = ifelse(Vendor %in% c('SagePackages'), 0, `Jun-2024`),
+         `Jul-2024` = ifelse(Vendor %in% c('SagePackages'), 0, `Jul-2024`),
+         `Aug-2024` = ifelse(Vendor %in% c('SagePackages'), 0, `Aug-2024`),
+         `Sep-2024` = ifelse(Vendor %in% c('SagePackages'), 0, `Sep-2024`),
+         `Oct-2024` = ifelse(Vendor %in% c('SagePackages'), 0, `Oct-2024`),
+         `Nov-2024` = ifelse(Vendor %in% c('SagePackages'), 0, `Nov-2024`),
+         `Dec-2024` = ifelse(Vendor %in% c('SagePackages'), 0, `Dec-2024`),
+         `Jan-2025` = ifelse(Vendor %in% c('SagePackages', 'AMS'), 0, `Jan-2025`),
+         `Feb-2025` = ifelse(Vendor %in% c('SagePackages', 'AMS'), 0, `Feb-2025`),
+         `Mar-2025` = ifelse(Vendor %in% c('SagePackages', 'AMS'), 0, `Mar-2025`),
+         `Apr-2025` = ifelse(Vendor %in% c('SagePackages', 'AMS'), 0, `Apr-2025`),
+         `May-2025` = ifelse(Vendor %in% c('SagePackages', 'AMS'), 0, `May-2025`),
+         `Jun-2025` = ifelse(Vendor %in% c('SagePackages', 'AMS'), 0, `Jun-2025`),
+         `Jul-2025` = ifelse(Vendor %in% c('SagePackages'), 0, `Jul-2025`),
+         `Aug-2025` = ifelse(Vendor %in% c('SagePackages'), 0, `Aug-2025`),
+         `Sep-2025` = ifelse(Vendor %in% c('SagePackages'), 0, `Sep-2025`),
+         `Oct-2025` = ifelse(Vendor %in% c('SagePackages'), 0, `Oct-2025`),
+         `Nov-2025` = ifelse(Vendor %in% c('SagePackages'), 0, `Nov-2025`),
+         `Dec-2025` = ifelse(Vendor %in% c('SagePackages'), 0, `Dec-2025`),
+         `Jan-2026` = ifelse(Vendor %in% c('SagePackages', 'Docuseek'), 0, `Jan-2026`),
+         `Feb-2026` = ifelse(Vendor %in% c('SagePackages', 'Docuseek'), 0, `Feb-2026`),
+         `Mar-2026` = ifelse(Vendor %in% c('SagePackages', 'Docuseek'), 0, `Mar-2026`),
+         `Apr-2026` = ifelse(Vendor %in% c('SagePackages', 'Docuseek'), 0, `Apr-2026`),
+         `May-2026` = ifelse(Vendor %in% c('SagePackages', 'Docuseek'), 0, `May-2026`),
+         `Jun-2026` = ifelse(Vendor %in% c('SagePackages', 'Docuseek'), 0, `Jun-2026`)) |>
+  select(-c('index', 'Reporting_Period_Total'))
+
+drArchiveZeroed
+```
+
+
+```{r}
+dbWriteTable(con, 'DR_Archive', drArchiveZeroed, overwrite = TRUE, row.names = FALSE)
+```
+
+
+
+
+# DR_D1 Cleaning for Python Usage Fixing
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+drd1Raw <- dbGetQuery(con,
+                    'SELECT *
+                    FROM DR_D1_Raw')
+
+drd1Raw
+```
+
+
+
+```{r}
+drd1RawZeroed <- drd1Raw |>
+  mutate(`Jul-2025` = ifelse(Vendor %in% c('SocialExplorer'), 0, `Jul-2025`),
+         `Aug-2025` = ifelse(Vendor %in% c('SocialExplorer'), 0, `Aug-2025`),
+         `Sep-2025` = ifelse(Vendor %in% c('SocialExplorer'), 0, `Sep-2025`),
+         `Oct-2025` = ifelse(Vendor %in% c('SocialExplorer'), 0, `Oct-2025`),
+         `Nov-2025` = ifelse(Vendor %in% c('SocialExplorer'), 0, `Nov-2025`),
+         `Dec-2025` = ifelse(Vendor %in% c('SocialExplorer'), 0, `Dec-2025`),
+         `Jan-2026` = ifelse(Vendor %in% c('SocialExplorer'), 0, `Jan-2026`),
+         `Feb-2026` = ifelse(Vendor %in% c('SocialExplorer'), 0, `Feb-2026`),
+         `Mar-2026` = ifelse(Vendor %in% c('SocialExplorer'), 0, `Mar-2026`),
+         `Apr-2026` = ifelse(Vendor %in% c('SocialExplorer'), 0, `Apr-2026`),
+         `May-2026` = ifelse(Vendor %in% c('SocialExplorer'), 0, `May-2026`),
+         `Jun-2026` = ifelse(Vendor %in% c('SocialExplorer', 'Bloomsbury'), 0, `Jun-2026`)) |>
+  select(-c('index', 'Reporting_Period_Total'))
+
+drd1RawZeroed
+```
+
+
+```{r}
+dbWriteTable(con, 'DR_D1_Raw', drd1RawZeroed, overwrite = TRUE, row.names = FALSE)
+```
+
+
+
+
+
+# IR_M1 Cleaning for Python Usage Fixing
+
+```{r}
+con <- dbConnect(SQLite(), "C:\\Users\\aharrima\\OneDrive - University of Tennessee\\Documents\\Big_Usage_Database_Updated.db")
+
+irm1Raw <- dbGetQuery(con,
+                    'SELECT *
+                    FROM IR_M1_Raw')
+
+irm1Raw
+```
+
+
+
+
+```{r}
+irm1RawZeroed <- irm1Raw |>
+  mutate(`Jan-2023` = ifelse(Vendor == 'JSTOR', 0, `Jan-2023`),
+         `Feb-2023` = ifelse(Vendor == 'JSTOR', 0, `Feb-2023`),
+         `Mar-2023` = ifelse(Vendor == 'JSTOR', 0, `Mar-2023`),
+         `Apr-2023` = ifelse(Vendor == 'JSTOR', 0, `Apr-2023`),
+         `May-2023` = ifelse(Vendor == 'JSTOR', 0, `May-2023`),
+         `Jun-2023` = ifelse(Vendor == 'JSTOR', 0, `Jun-2023`),
+         `Jul-2023` = ifelse(Vendor == 'JSTOR', 0, `Jul-2023`),
+         `Aug-2023` = ifelse(Vendor == 'JSTOR', 0, `Aug-2023`),
+         `Sep-2023` = ifelse(Vendor == 'JSTOR', 0, `Sep-2023`),
+         `Oct-2023` = ifelse(Vendor == 'JSTOR', 0, `Oct-2023`),
+         `Nov-2023` = ifelse(Vendor == 'JSTOR', 0, `Nov-2023`),
+         `Dec-2023` = ifelse(Vendor == 'JSTOR', 0, `Dec-2023`),
+         `Jan-2024` = ifelse(Vendor %in% c('JSTOR'), 0, `Jan-2024`),
+         `Feb-2024` = ifelse(Vendor %in% c('JSTOR'), 0, `Feb-2024`),
+         `Mar-2024` = ifelse(Vendor %in% c('JSTOR'), 0, `Mar-2024`),
+         `Apr-2024` = ifelse(Vendor %in% c('JSTOR'), 0, `Apr-2024`),
+         `May-2024` = ifelse(Vendor %in% c('JSTOR'), 0, `May-2024`),
+         `Jun-2024` = ifelse(Vendor %in% c('JSTOR'), 0, `Jun-2024`),
+         `Jul-2024` = ifelse(Vendor %in% c('JSTOR'), 0, `Jul-2024`),
+         `Aug-2024` = ifelse(Vendor %in% c('JSTOR'), 0, `Aug-2024`),
+         `Sep-2024` = ifelse(Vendor %in% c('JSTOR'), 0, `Sep-2024`),
+         `Oct-2024` = ifelse(Vendor %in% c('JSTOR'), 0, `Oct-2024`),
+         `Nov-2024` = ifelse(Vendor %in% c('JSTOR'), 0, `Nov-2024`),
+         `Dec-2024` = ifelse(Vendor %in% c('JSTOR'), 0, `Dec-2024`),
+         `Jan-2025` = ifelse(Vendor %in% c('JSTOR'), 0, `Jan-2025`),
+         `Feb-2025` = ifelse(Vendor %in% c('JSTOR'), 0, `Feb-2025`),
+         `Mar-2025` = ifelse(Vendor %in% c('JSTOR'), 0, `Mar-2025`),
+         `Apr-2025` = ifelse(Vendor %in% c('JSTOR'), 0, `Apr-2025`),
+         `May-2025` = ifelse(Vendor %in% c('JSTOR'), 0, `May-2025`),
+         `Jun-2025` = ifelse(Vendor %in% c('JSTOR'), 0, `Jun-2025`),
+         `Jul-2025` = ifelse(Vendor %in% c('JSTOR'), 0, `Jul-2025`),
+         `Aug-2025` = ifelse(Vendor %in% c('JSTOR'), 0, `Aug-2025`),
+         `Sep-2025` = ifelse(Vendor %in% c('JSTOR'), 0, `Sep-2025`),
+         `Oct-2025` = ifelse(Vendor %in% c('JSTOR'), 0, `Oct-2025`),
+         `Nov-2025` = ifelse(Vendor %in% c('JSTOR'), 0, `Nov-2025`),
+         `Dec-2025` = ifelse(Vendor %in% c('JSTOR'), 0, `Dec-2025`),
+         `Jan-2026` = ifelse(Vendor %in% c('JSTOR'), 0, `Jan-2026`),
+         `Feb-2026` = ifelse(Vendor %in% c('JSTOR'), 0, `Feb-2026`),
+         `Mar-2026` = ifelse(Vendor %in% c('JSTOR'), 0, `Mar-2026`),
+         `Apr-2026` = ifelse(Vendor %in% c('JSTOR'), 0, `Apr-2026`),
+         `May-2026` = ifelse(Vendor %in% c('JSTOR'), 0, `May-2026`),
+         `Jun-2026` = ifelse(Vendor %in% c('JSTOR'), 0, `Jun-2026`)) |>
+  select(-c('index'))
+
+irm1RawZeroed
+```
+
+
+```{r}
+dbWriteTable(con, 'IR_M1_Raw', irm1RawZeroed, overwrite = TRUE, row.names = FALSE)
+```
+
